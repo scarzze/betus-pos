@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Zap } from 'lucide-react';
+import vinlexLogo from '@/assets/vinlex-logo.png';
 
 interface LoadingScreenProps {
   onComplete: () => void;
@@ -24,8 +24,8 @@ const LoadingScreen = ({ onComplete }: LoadingScreenProps) => {
 
   return (
     <div className="fixed inset-0 z-50 flex flex-col items-center justify-center gradient-dark">
-      <div className="mb-8 flex h-20 w-20 items-center justify-center rounded-2xl gradient-orange glow-orange animate-pulse-glow">
-        <Zap className="h-10 w-10 text-primary-foreground" />
+      <div className="mb-8 flex h-24 w-24 items-center justify-center rounded-2xl glow-orange animate-pulse-glow overflow-hidden">
+        <img src={vinlexLogo} alt="VinLex Logo" className="h-full w-full object-contain" />
       </div>
       <h1 className="mb-2 font-display text-2xl font-bold text-gradient-orange">VinLex Electronics POS</h1>
       <p className="mb-8 text-sm text-muted-foreground">Initializing system…</p>
