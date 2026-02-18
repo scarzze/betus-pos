@@ -1,45 +1,143 @@
-import { useState } from 'react';
-import { Plus, Search, ShoppingCart, X, CreditCard, Banknote } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Search, ShoppingCart, X, CreditCard, Banknote, Loader2, CheckCircle } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/contexts/AuthContext';
+import { useToast } from '@/hooks/use-toast';
 
-interface CartItem {
+interface Product {
   id: string;
   name: string;
-  price: number;
-  qty: number;
+  selling_price: number;
+  buying_price: number;
+  stock: number;
+  sku: string;
 }
 
-const productCatalog = [
-  { id: '1', name: 'iPhone 15 Pro Max Case', price: 500 },
-  { id: '2', name: 'Samsung S24 Screen Protector', price: 300 },
-  { id: '3', name: 'USB-C Fast Charger 65W', price: 1500 },
-  { id: '4', name: 'Wireless Earbuds Pro', price: 3800 },
-  { id: '5', name: 'Lightning Cable 2m', price: 400 },
-  { id: '6', name: 'Samsung Galaxy A15', price: 19500 },
-  { id: '7', name: 'Phone Ring Holder', price: 200 },
-  { id: '8', name: 'Bluetooth Speaker Mini', price: 2200 },
-];
+interface CartItem extends Product {
+  qty: number;
+}
 
 const Sales = () => {
   const [cart, setCart] = useState<CartItem[]>([]);
   const [search, setSearch] = useState('');
   const [paymentMethod, setPaymentMethod] = useState<'cash' | 'mpesa'>('cash');
+  const [products, setProducts] = useState<Product[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [completing, setCompleting] = useState(false);
+  const [saleComplete, setSaleComplete] = useState(false);
+  const { user } = useAuth();
+  const { toast } = useToast();
+  const isSales = user?.role === 'SALES';
 
-  const addToCart = (product: typeof productCatalog[0]) => {
+  useEffect(() => {
+    const fetchProducts = async () => {
+      const { data } = await supabase
+        .from('products')
+        .select('id, name, selling_price, buying_price, stock, sku')
+        .gt('stock', 0)
+        .order('name');
+      if (data) setProducts(data);
+      setLoading(false);
+    };
+    fetchProducts();
+  }, [saleComplete]);
+
+  const addToCart = (product: Product) => {
     setCart((prev) => {
       const existing = prev.find((i) => i.id === product.id);
-      if (existing) return prev.map((i) => (i.id === product.id ? { ...i, qty: i.qty + 1 } : i));
-      return [...prev, { id: product.id, name: product.name, price: product.price, qty: 1 }];
+      if (existing) {
+        if (existing.qty >= product.stock) {
+          toast({ title: 'Out of stock', description: `Only ${product.stock} available`, variant: 'destructive' });
+          return prev;
+        }
+        return prev.map((i) => (i.id === product.id ? { ...i, qty: i.qty + 1 } : i));
+      }
+      return [...prev, { ...product, qty: 1 }];
     });
   };
 
   const removeFromCart = (id: string) => setCart((prev) => prev.filter((i) => i.id !== id));
   const updateQty = (id: string, qty: number) => {
     if (qty <= 0) return removeFromCart(id);
+    const item = cart.find(i => i.id === id);
+    if (item && qty > item.stock) {
+      toast({ title: 'Out of stock', description: `Only ${item.stock} available`, variant: 'destructive' });
+      return;
+    }
     setCart((prev) => prev.map((i) => (i.id === id ? { ...i, qty } : i)));
   };
 
-  const total = cart.reduce((sum, i) => sum + i.price * i.qty, 0);
-  const filteredProducts = productCatalog.filter((p) => p.name.toLowerCase().includes(search.toLowerCase()));
+  const totalAmount = cart.reduce((sum, i) => sum + i.selling_price * i.qty, 0);
+  const totalCost = cart.reduce((sum, i) => sum + i.buying_price * i.qty, 0);
+  const profit = totalAmount - totalCost;
+  const filteredProducts = products.filter((p) => p.name.toLowerCase().includes(search.toLowerCase()));
+
+  const completeSale = async () => {
+    if (cart.length === 0) return;
+    setCompleting(true);
+
+    const { data: { user: authUser } } = await supabase.auth.getUser();
+    if (!authUser) {
+      toast({ title: 'Error', description: 'Not authenticated', variant: 'destructive' });
+      setCompleting(false);
+      return;
+    }
+
+    const saleNumber = `S${Date.now().toString(36).toUpperCase()}`;
+
+    const { data: sale, error: saleError } = await supabase
+      .from('sales')
+      .insert({
+        sale_number: saleNumber,
+        user_id: authUser.id,
+        payment_method: paymentMethod,
+        total_amount: totalAmount,
+        total_cost: totalCost,
+        profit,
+      })
+      .select()
+      .single();
+
+    if (saleError || !sale) {
+      toast({ title: 'Sale Failed', description: saleError?.message || 'Unknown error', variant: 'destructive' });
+      setCompleting(false);
+      return;
+    }
+
+    const saleItems = cart.map((item) => ({
+      sale_id: sale.id,
+      product_id: item.id,
+      product_name: item.name,
+      quantity: item.qty,
+      selling_price: item.selling_price,
+      buying_price: item.buying_price,
+      subtotal: item.selling_price * item.qty,
+    }));
+
+    await supabase.from('sale_items').insert(saleItems);
+
+    // Deduct stock
+    for (const item of cart) {
+      await supabase
+        .from('products')
+        .update({ stock: item.stock - item.qty })
+        .eq('id', item.id);
+    }
+
+    setCart([]);
+    setCompleting(false);
+    setSaleComplete(true);
+    toast({ title: '✅ Sale Complete', description: `${saleNumber} — KES ${totalAmount.toLocaleString()}` });
+    setTimeout(() => setSaleComplete(false), 2000);
+  };
+
+  if (loading) {
+    return (
+      <div className="flex h-full items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
 
   return (
     <div className="flex h-full flex-col lg:flex-row">
@@ -72,7 +170,11 @@ const Sales = () => {
                 <ShoppingCart className="h-5 w-5 text-primary" />
               </div>
               <p className="text-sm font-medium text-foreground leading-tight">{product.name}</p>
-              <p className="mt-1 font-display text-lg font-bold text-primary">KES {product.price.toLocaleString()}</p>
+              <p className="mt-1 font-display text-lg font-bold text-primary">KES {product.selling_price.toLocaleString()}</p>
+              {!isSales && (
+                <p className="text-xs text-muted-foreground">Buy: KES {product.buying_price.toLocaleString()}</p>
+              )}
+              <p className="text-xs text-muted-foreground">{product.stock} in stock</p>
             </button>
           ))}
         </div>
@@ -88,15 +190,27 @@ const Sales = () => {
           <div className="flex-1 overflow-auto p-4 space-y-3">
             {cart.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
-                <ShoppingCart className="mb-3 h-10 w-10 opacity-30" />
-                <p className="text-sm">Cart is empty</p>
+                {saleComplete ? (
+                  <>
+                    <CheckCircle className="mb-3 h-10 w-10 text-success" />
+                    <p className="text-sm text-success font-semibold">Sale Completed!</p>
+                  </>
+                ) : (
+                  <>
+                    <ShoppingCart className="mb-3 h-10 w-10 opacity-30" />
+                    <p className="text-sm">Cart is empty</p>
+                  </>
+                )}
               </div>
             ) : (
               cart.map((item) => (
                 <div key={item.id} className="flex items-center gap-3 rounded-lg bg-secondary p-3">
                   <div className="flex-1">
                     <p className="text-sm font-medium text-foreground">{item.name}</p>
-                    <p className="text-xs text-muted-foreground">KES {item.price.toLocaleString()} each</p>
+                    <p className="text-xs text-muted-foreground">KES {item.selling_price.toLocaleString()} each</p>
+                    {!isSales && (
+                      <p className="text-xs text-muted-foreground/60">Cost: KES {item.buying_price.toLocaleString()}</p>
+                    )}
                   </div>
                   <div className="flex items-center gap-2">
                     <button onClick={() => updateQty(item.id, item.qty - 1)} className="flex h-7 w-7 items-center justify-center rounded-md bg-muted text-sm font-bold text-foreground hover:bg-primary/20">−</button>
@@ -113,9 +227,29 @@ const Sales = () => {
 
           {/* Checkout */}
           <div className="border-t border-border p-4 space-y-4">
-            <div className="flex items-center justify-between">
-              <span className="text-sm font-medium text-muted-foreground">Total</span>
-              <span className="font-display text-2xl font-bold text-foreground">KES {total.toLocaleString()}</span>
+            <div className="space-y-1">
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-medium text-muted-foreground">Subtotal</span>
+                <span className="text-sm font-semibold text-foreground">KES {totalAmount.toLocaleString()}</span>
+              </div>
+              {!isSales && (
+                <>
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs text-muted-foreground">Total Cost</span>
+                    <span className="text-xs text-muted-foreground">KES {totalCost.toLocaleString()}</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs text-muted-foreground">Profit</span>
+                    <span className={`text-xs font-semibold ${profit >= 0 ? 'text-success' : 'text-destructive'}`}>
+                      KES {profit.toLocaleString()}
+                    </span>
+                  </div>
+                </>
+              )}
+              <div className="flex items-center justify-between pt-1">
+                <span className="text-sm font-medium text-muted-foreground">Total</span>
+                <span className="font-display text-2xl font-bold text-foreground">KES {totalAmount.toLocaleString()}</span>
+              </div>
             </div>
 
             {/* Payment method */}
@@ -141,10 +275,18 @@ const Sales = () => {
             </div>
 
             <button
-              disabled={cart.length === 0}
-              className="w-full rounded-lg gradient-orange px-4 py-3 text-sm font-semibold text-primary-foreground transition-opacity hover:opacity-90 disabled:opacity-30"
+              disabled={cart.length === 0 || completing}
+              onClick={completeSale}
+              className="w-full rounded-lg gradient-orange px-4 py-3 text-sm font-semibold text-primary-foreground transition-opacity hover:opacity-90 disabled:opacity-30 flex items-center justify-center gap-2"
             >
-              Complete Sale — KES {total.toLocaleString()}
+              {completing ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Processing…
+                </>
+              ) : (
+                `Complete Sale — KES ${totalAmount.toLocaleString()}`
+              )}
             </button>
           </div>
         </div>
