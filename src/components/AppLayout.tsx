@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
+import vinlexLogo from '@/assets/vinlex-logo.png';
 import {
   LayoutDashboard,
   Package,
@@ -12,7 +13,6 @@ import {
   ChevronLeft,
   ChevronRight,
   Users,
-  Zap,
 } from 'lucide-react';
 
 const AppLayout = ({ children }: { children: React.ReactNode }) => {
@@ -46,14 +46,11 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
 
   return (
     <div className="flex h-screen overflow-hidden">
-      <aside
-        className={`${
-          collapsed ? 'w-[72px]' : 'w-64'
-        } flex flex-col border-r border-border bg-sidebar transition-all duration-300`}
-      >
+      <aside className={`${collapsed ? 'w-[72px]' : 'w-64'} flex flex-col border-r border-border bg-sidebar transition-all duration-300`}>
+        {/* Logo */}
         <div className="flex h-16 items-center gap-3 border-b border-border px-4">
-          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg gradient-orange">
-            <Zap className="h-5 w-5 text-primary-foreground" />
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg overflow-hidden">
+            <img src={vinlexLogo} alt="VinLex" className="h-full w-full object-contain" />
           </div>
           {!collapsed && (
             <div className="overflow-hidden">
@@ -63,19 +60,15 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
           )}
         </div>
 
+        {/* Nav */}
         <nav className="flex-1 space-y-1 px-3 py-4">
           {filteredNav.map((item) => {
             const isActive = location.pathname === item.path;
             return (
-              <Link
-                key={item.path}
-                to={item.path}
+              <Link key={item.path} to={item.path}
                 className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all ${
-                  isActive
-                    ? 'bg-primary/10 text-primary glow-orange'
-                    : 'text-muted-foreground hover:bg-secondary hover:text-foreground'
-                }`}
-              >
+                  isActive ? 'bg-primary/10 text-primary glow-orange' : 'text-muted-foreground hover:bg-secondary hover:text-foreground'
+                }`}>
                 <item.icon className={`h-5 w-5 shrink-0 ${isActive ? 'text-primary' : ''}`} />
                 {!collapsed && <span>{item.label}</span>}
               </Link>
@@ -83,6 +76,7 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
           })}
         </nav>
 
+        {/* User section */}
         <div className="border-t border-border p-3">
           {!collapsed && user && (
             <div className="mb-3 rounded-lg bg-secondary p-3">
@@ -94,17 +88,13 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
             </div>
           )}
           <div className="flex items-center gap-2">
-            <button
-              onClick={() => setCollapsed(!collapsed)}
-              className="flex h-9 w-9 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
-            >
+            <button onClick={() => setCollapsed(!collapsed)}
+              className="flex h-9 w-9 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground">
               {collapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
             </button>
             {!collapsed && (
-              <button
-                onClick={handleLogout}
-                className="flex flex-1 items-center justify-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
-              >
+              <button onClick={handleLogout}
+                className="flex flex-1 items-center justify-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive">
                 <LogOut className="h-4 w-4" />
                 Logout
               </button>
@@ -113,9 +103,7 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
         </div>
       </aside>
 
-      <main className="flex-1 overflow-auto">
-        {children}
-      </main>
+      <main className="flex-1 overflow-auto">{children}</main>
     </div>
   );
 };
