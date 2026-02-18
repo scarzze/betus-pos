@@ -1,30 +1,51 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
+import { supabase } from '@/integrations/supabase/client';
 import { Zap, Eye, EyeOff, Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import LoadingScreen from '@/components/LoadingScreen';
 
 const Login = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [showLoading, setShowLoading] = useState(false);
+  const [isSignUp, setIsSignUp] = useState(false);
+  const [name, setName] = useState('');
   const { login, isLoading } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    if (isSignUp) {
+      const { error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: { data: { name } },
+      });
+      if (error) {
+        toast({ title: 'Sign Up Failed', description: error.message, variant: 'destructive' });
+      } else {
+        toast({ title: 'Account created!', description: 'You can now sign in.' });
+        setIsSignUp(false);
+      }
+      return;
+    }
+
     const success = await login(email, password);
     if (success) {
-      navigate('/dashboard');
+      setShowLoading(true);
     } else {
-      toast({
-        title: 'Login Failed',
-        description: 'Invalid email or password.',
-        variant: 'destructive',
-      });
+      toast({ title: 'Login Failed', description: 'Invalid email or password.', variant: 'destructive' });
     }
   };
+
+  if (showLoading) {
+    return <LoadingScreen onComplete={() => navigate('/dashboard')} />;
+  }
 
   return (
     <div className="flex min-h-screen items-center justify-center gradient-dark p-4">
@@ -40,8 +61,23 @@ const Login = () => {
 
         {/* Login Card */}
         <div className="glass-card p-8">
-          <h2 className="mb-6 font-display text-xl font-semibold text-foreground">Sign In</h2>
+          <h2 className="mb-6 font-display text-xl font-semibold text-foreground">
+            {isSignUp ? 'Create Account' : 'Sign In'}
+          </h2>
           <form onSubmit={handleSubmit} className="space-y-5">
+            {isSignUp && (
+              <div>
+                <label className="mb-1.5 block text-sm font-medium text-muted-foreground">Full Name</label>
+                <input
+                  type="text"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  className="w-full rounded-lg border border-border bg-secondary px-4 py-3 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                  placeholder="Dan Cheru"
+                  required
+                />
+              </div>
+            )}
             <div>
               <label className="mb-1.5 block text-sm font-medium text-muted-foreground">Email</label>
               <input
@@ -63,6 +99,7 @@ const Login = () => {
                   className="w-full rounded-lg border border-border bg-secondary px-4 py-3 pr-12 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
                   placeholder="••••••••"
                   required
+                  minLength={6}
                 />
                 <button
                   type="button"
@@ -81,22 +118,21 @@ const Login = () => {
               {isLoading ? (
                 <>
                   <Loader2 className="h-4 w-4 animate-spin" />
-                  Signing in…
+                  {isSignUp ? 'Creating…' : 'Signing in…'}
                 </>
               ) : (
-                'Sign In'
+                isSignUp ? 'Create Account' : 'Sign In'
               )}
             </button>
           </form>
 
-          {/* Demo credentials */}
-          <div className="mt-6 rounded-lg border border-border bg-secondary/50 p-4">
-            <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Demo Accounts</p>
-            <div className="space-y-1.5 text-xs text-muted-foreground">
-              <p><span className="text-primary font-medium">Super Admin:</span> hydancheru@gmail.com / DanHacks@2030</p>
-              <p><span className="text-info font-medium">Admin:</span> admin@vinlex.co.ke / admin123</p>
-              <p><span className="text-success font-medium">Sales:</span> sales@vinlex.co.ke / sales123</p>
-            </div>
+          <div className="mt-4 text-center">
+            <button
+              onClick={() => setIsSignUp(!isSignUp)}
+              className="text-sm text-primary hover:underline"
+            >
+              {isSignUp ? 'Already have an account? Sign In' : "Don't have an account? Sign Up"}
+            </button>
           </div>
         </div>
       </div>

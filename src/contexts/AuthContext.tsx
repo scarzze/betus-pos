@@ -1,4 +1,6 @@
-import React, { createContext, useContext, useState, useCallback } from 'react';
+import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
+import { supabase } from '@/integrations/supabase/client';
+import type { User as SupabaseUser } from '@supabase/supabase-js';
 
 export type UserRole = 'SUPER_ADMIN' | 'ADMIN' | 'SALES';
 
@@ -20,44 +22,80 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-// Mock users for demo
-const MOCK_USERS: { email: string; password: string; user: User }[] = [
-  {
-    email: 'hydancheru@gmail.com',
-    password: 'DanHacks@2030',
-    user: { id: '1', name: 'Dan Cheru', email: 'hydancheru@gmail.com', role: 'SUPER_ADMIN' },
-  },
-  {
-    email: 'admin@vinlex.co.ke',
-    password: 'admin123',
-    user: { id: '2', name: 'Jane Wanjiku', email: 'admin@vinlex.co.ke', role: 'ADMIN' },
-  },
-  {
-    email: 'sales@vinlex.co.ke',
-    password: 'sales123',
-    user: { id: '3', name: 'Kevin Ochieng', email: 'sales@vinlex.co.ke', role: 'SALES' },
-  },
-];
+const mapRole = (dbRole: string): UserRole => {
+  switch (dbRole) {
+    case 'super_admin': return 'SUPER_ADMIN';
+    case 'admin': return 'ADMIN';
+    case 'sales': return 'SALES';
+    default: return 'SALES';
+  }
+};
+
+const buildUser = async (supaUser: SupabaseUser): Promise<User | null> => {
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('name, email, avatar_url')
+    .eq('user_id', supaUser.id)
+    .single();
+
+  const { data: roles } = await supabase
+    .from('user_roles')
+    .select('role')
+    .eq('user_id', supaUser.id);
+
+  const topRole = roles && roles.length > 0
+    ? roles.some(r => r.role === 'super_admin') ? 'super_admin'
+      : roles.some(r => r.role === 'admin') ? 'admin' : 'sales'
+    : 'sales';
+
+  return {
+    id: supaUser.id,
+    name: profile?.name || supaUser.email?.split('@')[0] || 'User',
+    email: profile?.email || supaUser.email || '',
+    role: mapRole(topRole),
+    avatar: profile?.avatar_url || undefined,
+  };
+};
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
+      if (session?.user) {
+        const appUser = await buildUser(session.user);
+        setUser(appUser);
+      } else {
+        setUser(null);
+      }
+      setIsLoading(false);
+    });
+
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
+      if (session?.user) {
+        const appUser = await buildUser(session.user);
+        setUser(appUser);
+      }
+      setIsLoading(false);
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
 
   const login = useCallback(async (email: string, password: string): Promise<boolean> => {
     setIsLoading(true);
-    // Simulate API delay
-    await new Promise((r) => setTimeout(r, 1500));
-    const found = MOCK_USERS.find((u) => u.email === email && u.password === password);
-    if (found) {
-      setUser(found.user);
+    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    if (error) {
       setIsLoading(false);
-      return true;
+      return false;
     }
-    setIsLoading(false);
-    return false;
+    // onAuthStateChange will handle setting the user
+    return true;
   }, []);
 
-  const logout = useCallback(() => {
+  const logout = useCallback(async () => {
+    await supabase.auth.signOut();
     setUser(null);
   }, []);
 

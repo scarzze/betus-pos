@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
+import { supabase } from '@/integrations/supabase/client';
 import {
   LayoutDashboard,
   Package,
@@ -20,7 +21,8 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
   const location = useLocation();
   const navigate = useNavigate();
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
     logout();
     navigate('/login');
   };
@@ -44,13 +46,11 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
 
   return (
     <div className="flex h-screen overflow-hidden">
-      {/* Sidebar */}
       <aside
         className={`${
           collapsed ? 'w-[72px]' : 'w-64'
         } flex flex-col border-r border-border bg-sidebar transition-all duration-300`}
       >
-        {/* Logo */}
         <div className="flex h-16 items-center gap-3 border-b border-border px-4">
           <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg gradient-orange">
             <Zap className="h-5 w-5 text-primary-foreground" />
@@ -63,7 +63,6 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
           )}
         </div>
 
-        {/* Nav */}
         <nav className="flex-1 space-y-1 px-3 py-4">
           {filteredNav.map((item) => {
             const isActive = location.pathname === item.path;
@@ -84,7 +83,6 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
           })}
         </nav>
 
-        {/* User section */}
         <div className="border-t border-border p-3">
           {!collapsed && user && (
             <div className="mb-3 rounded-lg bg-secondary p-3">
@@ -115,7 +113,6 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
         </div>
       </aside>
 
-      {/* Main content */}
       <main className="flex-1 overflow-auto">
         {children}
       </main>
