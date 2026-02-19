@@ -1,86 +1,35 @@
-import { Toaster } from "@/components/ui/toaster";
-import { Toaster as Sonner } from "@/components/ui/sonner";
-import { TooltipProvider } from "@/components/ui/tooltip";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
-import { AuthProvider } from "@/contexts/AuthContext";
-import ProtectedRoute from "@/components/ProtectedRoute";
-import AppLayout from "@/components/AppLayout";
-import Login from "./pages/Login";
-import Dashboard from "./pages/Dashboard";
-import Products from "./pages/Products";
-import Sales from "./pages/Sales";
-import Reports from "./pages/Reports";
-import UsersPage from "./pages/UsersPage";
-import SettingsPage from "./pages/SettingsPage";
-import NotFound from "./pages/NotFound";
+import { useState } from 'react'
+import reactLogo from './assets/react.svg'
+import viteLogo from '/vite.svg'
+import './App.css'
 
-const queryClient = new QueryClient();
+function App() {
+  const [count, setCount] = useState(0)
 
-const App = () => (
-  <QueryClientProvider client={queryClient}>
-    <TooltipProvider>
-      <Toaster />
-      <Sonner />
-      <AuthProvider>
-        <BrowserRouter>
-          <Routes>
-            <Route path="/login" element={<Login />} />
-            <Route path="/" element={<Navigate to="/dashboard" replace />} />
-            <Route
-              path="/dashboard"
-              element={
-                <ProtectedRoute>
-                  <AppLayout><Dashboard /></AppLayout>
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/products"
-              element={
-                <ProtectedRoute allowedRoles={['SUPER_ADMIN', 'ADMIN']}>
-                  <AppLayout><Products /></AppLayout>
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/sales"
-              element={
-                <ProtectedRoute>
-                  <AppLayout><Sales /></AppLayout>
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/reports"
-              element={
-                <ProtectedRoute allowedRoles={['SUPER_ADMIN', 'ADMIN']}>
-                  <AppLayout><Reports /></AppLayout>
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/users"
-              element={
-                <ProtectedRoute allowedRoles={['SUPER_ADMIN', 'ADMIN']}>
-                  <AppLayout><UsersPage /></AppLayout>
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/settings"
-              element={
-                <ProtectedRoute allowedRoles={['SUPER_ADMIN', 'ADMIN']}>
-                  <AppLayout><SettingsPage /></AppLayout>
-                </ProtectedRoute>
-              }
-            />
-            <Route path="*" element={<NotFound />} />
-          </Routes>
-        </BrowserRouter>
-      </AuthProvider>
-    </TooltipProvider>
-  </QueryClientProvider>
-);
+  return (
+    <>
+      <div>
+        <a href="https://vite.dev" target="_blank">
+          <img src={viteLogo} className="logo" alt="Vite logo" />
+        </a>
+        <a href="https://react.dev" target="_blank">
+          <img src={reactLogo} className="logo react" alt="React logo" />
+        </a>
+      </div>
+      <h1>Vite + React</h1>
+      <div className="card">
+        <button onClick={() => setCount((count) => count + 1)}>
+          count is {count}
+        </button>
+        <p>
+          Edit <code>src/App.tsx</code> and save to test HMR
+        </p>
+      </div>
+      <p className="read-the-docs">
+        Click on the Vite and React logos to learn more
+      </p>
+    </>
+  )
+}
 
-export default App;
+export default App
