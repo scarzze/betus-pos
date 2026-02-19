@@ -1,5 +1,4 @@
 import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
-import { supabase } from '@/integrations/supabase/client';
 import type { User as SupabaseUser } from '@supabase/supabase-js';
 
 export type UserRole = 'SUPER_ADMIN' | 'ADMIN' | 'SALES';
