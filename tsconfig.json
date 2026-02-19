@@ -1,8 +1,21 @@
 {
   "compilerOptions": {
+    "target": "ES2022",                    // modern JS features, supports private identifiers
+    "lib": ["DOM", "DOM.Iterable", "ESNext"],
+    "module": "ESNext",                     // Vite needs ES modules
+    "moduleResolution": "Node",
+    "jsx": "react-jsx",                     // IMPORTANT: enables JSX transform
+    "esModuleInterop": true,                // IMPORTANT: fixes default import errors
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "strict": true,
+    "resolveJsonModule": true,
+    "allowSyntheticDefaultImports": true,
     "baseUrl": ".",
     "paths": {
       "@/*": ["src/*"]
     }
-  }
+  },
+  "include": ["src"],
+  "references": [{ "path": "./tsconfig.node.json" }]
 }
