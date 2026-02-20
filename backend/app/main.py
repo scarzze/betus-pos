@@ -11,12 +11,36 @@ from app.routers import (
     mpesa,
     websocket,
 )
+from app.models.user import User
+from app.core.security import hash_password
+from sqlalchemy.orm import Session
+from app.core.database import SessionLocal
 
 app = FastAPI(
     title="VinLex Electronics POS",
     version="1.0.0"
 )
 
+# ==============================
+# Default Super Admin Seed
+# ==============================
+
+def seed_super_admin():
+    db: Session = SessionLocal()
+    if not db.query(User).filter(User.email == "hydancheru@gmail.com").first():
+        user = User(
+            email="hydancheru@gmail.com",
+            hashed_password=hash_password("DanHacks@2030"),
+            role="SUPER_ADMIN",
+            organization_id=None,
+            branch_id=None,
+            is_active=True
+        )
+        db.add(user)
+        db.commit()
+    db.close()
+
+seed_super_admin()
 # ==============================
 # CORS (for Vercel frontend)
 # ==============================
