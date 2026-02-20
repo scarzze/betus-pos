@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { Search, Plus, MoreVertical, Shield, UserCheck, UserX } from 'lucide-react';
+import { formatCurrency, formatDate } from '@/lib/utils';
 
 interface UserRecord {
   id: string;
