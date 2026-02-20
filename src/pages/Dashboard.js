@@ -6,8 +6,12 @@ import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from "@/componen
 import { WeeklyBarChart, PaymentPieChart } from "@/components/ui/chart";
 import { useAuth } from "@/contexts/AuthContext";
 const Dashboard = () => {
-    const { user } = useAuth();
-    const displayName = user?.user_metadata?.full_name ?? user?.user_metadata?.username ?? "User";
+    const { user } = useAuth(); // removed <User>() generic
+    const displayName = user?.full_name ??
+        user?.username ??
+        user?.user_metadata?.full_name ??
+        user?.user_metadata?.username ??
+        "User";
     const [weeklySales, setWeeklySales] = useState([]);
     const [paymentBreakdown, setPaymentBreakdown] = useState([]);
     const [stats, setStats] = useState({
@@ -27,11 +31,9 @@ const Dashboard = () => {
                 const totalSales = todaySalesArr.reduce((sum, r) => sum + r.total_amount, 0);
                 const totalProfit = todaySalesArr.reduce((sum, r) => sum + Math.max(0, r.profit), 0);
                 const totalLoss = todaySalesArr.reduce((sum, r) => sum + Math.abs(Math.min(0, r.profit)), 0);
-                const cash = sales
-                    .filter((s) => s.payment_method === "cash")
+                const cash = sales.filter((s) => s.payment_method === "cash")
                     .reduce((sum, r) => sum + r.total_amount, 0);
-                const mpesa = sales
-                    .filter((s) => s.payment_method === "mpesa")
+                const mpesa = sales.filter((s) => s.payment_method === "mpesa")
                     .reduce((sum, r) => sum + r.total_amount, 0);
                 setPaymentBreakdown([
                     { name: "Cash", value: cash },
@@ -50,11 +52,9 @@ const Dashboard = () => {
                     const dayStr = d.toISOString().slice(0, 10);
                     return {
                         day: d.toLocaleDateString("en", { weekday: "short" }),
-                        sales: sales
-                            .filter((s) => s.created_at.slice(0, 10) === dayStr)
+                        sales: sales.filter((s) => s.created_at.slice(0, 10) === dayStr)
                             .reduce((sum, r) => sum + r.total_amount, 0),
-                        profit: sales
-                            .filter((s) => s.created_at.slice(0, 10) === dayStr)
+                        profit: sales.filter((s) => s.created_at.slice(0, 10) === dayStr)
                             .reduce((sum, r) => sum + r.profit, 0),
                     };
                 });
