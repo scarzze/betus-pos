@@ -1,14 +1,15 @@
-import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
+import { createContext, useContext, useState, useCallback, useEffect, ReactNode } from 'react';
 import axios from 'axios';
 
-export type UserRole = 'SUPER_ADMIN' | 'ADMIN' | 'SALES';
-
-export interface User {
+// ------------------------------
+// Types
+// ------------------------------
+interface User {
   id: string;
-  email: string;
-  role: UserRole;
+  role: 'SUPER_ADMIN' | 'ADMIN' | 'SALES';
   org?: string;
   branch?: string;
+  email?: string;
 }
 
 interface AuthContextType {
@@ -19,21 +20,33 @@ interface AuthContextType {
   logout: () => void;
 }
 
+interface AuthProviderProps {
+  children: ReactNode;
+}
+
+// ------------------------------
+// Constants
+// ------------------------------
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
-
-const parseRole = (role: string): UserRole => {
-  switch (role.toUpperCase()) {
-    case 'SUPER_ADMIN': return 'SUPER_ADMIN';
-    case 'ADMIN': return 'ADMIN';
-    case 'SALES': return 'SALES';
-    default: return 'SALES';
+// ------------------------------
+// Helper Functions
+// ------------------------------
+const parseRole = (role?: string): User['role'] => {
+  switch (role?.toUpperCase()) {
+    case 'SUPER_ADMIN':
+      return 'SUPER_ADMIN';
+    case 'ADMIN':
+      return 'ADMIN';
+    case 'SALES':
+    default:
+      return 'SALES';
   }
 };
 
-// Decode JWT (lightweight, no validation, just payload)
-const decodeJwt = (token: string): any => {
+// Decode JWT payload (no signature verification)
+const decodeJwt = (token: string): any | null => {
   try {
     const payload = token.split('.')[1];
     return JSON.parse(atob(payload));
@@ -42,7 +55,10 @@ const decodeJwt = (token: string): any => {
   }
 };
 
-export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+// ------------------------------
+// AuthProvider
+// ------------------------------
+export const AuthProvider = ({ children }: AuthProviderProps) => {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -57,18 +73,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           role: parseRole(payload.role),
           org: payload.org,
           branch: payload.branch,
-          email: payload.email || '', // optional if backend includes email
+          email: payload.email || '',
         });
       }
     }
     setIsLoading(false);
   }, []);
 
+  // Login function
   const login = useCallback(async (email: string, password: string): Promise<boolean> => {
     setIsLoading(true);
     try {
       const res = await axios.post(`${API_URL}/auth/login`, { email, password });
       const token = res.data.access_token;
+      if (!token) throw new Error('No access token returned');
+
       localStorage.setItem('access_token', token);
 
       const payload = decodeJwt(token);
@@ -78,32 +97,45 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           role: parseRole(payload.role),
           org: payload.org,
           branch: payload.branch,
-          email: email,
+          email,
         });
       }
+
       setIsLoading(false);
       return true;
     } catch (err) {
-      console.error(err);
+      console.error('Login failed:', err);
       setIsLoading(false);
       return false;
     }
   }, []);
 
+  // Logout function
   const logout = useCallback(() => {
     localStorage.removeItem('access_token');
     setUser(null);
   }, []);
 
   return (
-    <AuthContext.Provider value={{ user, isAuthenticated: !!user, isLoading, login, logout }}>
+    <AuthContext.Provider
+      value={{
+        user,
+        isAuthenticated: !!user,
+        isLoading,
+        login,
+        logout,
+      }}
+    >
       {children}
     </AuthContext.Provider>
   );
 };
 
-export const useAuth = () => {
+// ------------------------------
+// Hook
+// ------------------------------
+export const useAuth = (): AuthContextType => {
   const ctx = useContext(AuthContext);
-  if (!ctx) throw new Error('useAuth must be used within AuthProvider');
+  if (!ctx) throw new Error('useAuth must be used within an AuthProvider');
   return ctx;
 };
