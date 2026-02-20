@@ -43,15 +43,18 @@ const Products = () => {
   const { toast } = useToast();
 
   const fetchProducts = useCallback(async () => {
-     try {
-    const res = await fetch('http://localhost:8000/products');
-    const data = await res.json();
-    setProducts(data);
-  } catch (err) {
-    console.error(err);
-    toast({ title: 'Error', description: 'Failed to fetch products', variant: 'destructive' });
-  }
-  }, []);
+    setLoading(true);
+    try {
+      const res = await fetch('http://localhost:8000/products');
+      const data = await res.json();
+      setProducts(data);
+    } catch (err) {
+      console.error(err);
+      toast({ title: 'Error', description: 'Failed to fetch products', variant: 'destructive' });
+    } finally {
+      setLoading(false);
+    }
+  }, [toast]);
 
   useEffect(() => { fetchProducts(); }, [fetchProducts]);
 
@@ -82,7 +85,9 @@ const Products = () => {
     }
     setSaving(true);
     const payload = {
-      name: form.name, sku: form.sku, category: form.category || null,
+      name: form.name,
+      sku: form.sku,
+      category: form.category || null,
       buying_price: Number(form.buying_price) || 0,
       selling_price: Number(form.selling_price) || 0,
       stock: Number(form.stock) || 0,
@@ -90,24 +95,58 @@ const Products = () => {
       imei_tracked: form.imei_tracked,
     };
 
-    if (editingId) {
-      const { error } = await supabase.from('products').update(payload).eq('id', editingId);
-      if (error) { toast({ title: 'Error', description: error.message, variant: 'destructive' }); }
-      else { toast({ title: '✅ Product Updated' }); }
-    } else {
-      const { error } = await supabase.from('products').insert(payload);
-      if (error) { toast({ title: 'Error', description: error.message, variant: 'destructive' }); }
-      else { toast({ title: '✅ Product Added' }); }
+    try {
+      if (editingId) {
+        const res = await fetch(`http://localhost:8000/products/${editingId}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+        if (!res.ok) {
+          const err = await res.json();
+          toast({ title: 'Error', description: err.error || 'Failed to update product', variant: 'destructive' });
+        } else {
+          toast({ title: '✅ Product Updated' });
+        }
+      } else {
+        const res = await fetch('http://localhost:8000/products', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+        if (!res.ok) {
+          const err = await res.json();
+          toast({ title: 'Error', description: err.error || 'Failed to add product', variant: 'destructive' });
+        } else {
+          toast({ title: '✅ Product Added' });
+        }
+      }
+    } catch (err) {
+      console.error(err);
+      toast({ title: 'Error', description: 'Something went wrong', variant: 'destructive' });
     }
+
     setSaving(false);
     setShowModal(false);
     fetchProducts();
   };
 
   const handleDelete = async (id: string) => {
-    const { error } = await supabase.from('products').delete().eq('id', id);
-    if (error) toast({ title: 'Error', description: error.message, variant: 'destructive' });
-    else { toast({ title: 'Product Deleted' }); fetchProducts(); }
+    try {
+      const res = await fetch(`http://localhost:8000/products/${id}`, {
+        method: 'DELETE',
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        toast({ title: 'Error', description: err.error || 'Failed to delete product', variant: 'destructive' });
+      } else {
+        toast({ title: '✅ Product Deleted' });
+        fetchProducts();
+      }
+    } catch (err) {
+      console.error(err);
+      toast({ title: 'Error', description: 'Something went wrong', variant: 'destructive' });
+    }
   };
 
   if (loading) {
