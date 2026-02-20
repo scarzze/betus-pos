@@ -2,7 +2,6 @@
 import React from "react";
 import { PanelGroup, Panel, PanelResizeHandle } from "react-resizable-panels";
 
-// Props for the group
 interface ResizableGroupProps {
   direction?: "horizontal" | "vertical";
   children: React.ReactNode;
@@ -11,9 +10,7 @@ interface ResizableGroupProps {
 export const ResizablePanelGroup: React.FC<ResizableGroupProps> = ({
   direction = "horizontal",
   children,
-}) => {
-  return <PanelGroup direction={direction}>{children}</PanelGroup>;
-};
+}) => <PanelGroup direction={direction}>{children}</PanelGroup>;
 
 export const ResizablePanel: React.FC<{ children: React.ReactNode }> = ({ children }) => (
   <Panel>{children}</Panel>
