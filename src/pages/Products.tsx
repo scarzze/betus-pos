@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Search, Plus, Filter, Package, Pencil, Trash2, X, Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { formatCurrency, formatDate } from '@/lib/utils';
 
 interface Product {
   id: string;
