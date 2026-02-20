@@ -14,7 +14,7 @@ import {
   Legend,
   TooltipProps,
 } from 'recharts';
-import { ValueType, NameType } from 'recharts/types/component/DefaultTooltipContent';
+import { ValueType, NameType, TooltipPayload } from 'recharts/types/component/DefaultTooltipContent';
 
 interface SaleData {
   date: string;
@@ -27,7 +27,7 @@ const Dashboard = () => {
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined);
 
   useEffect(() => {
-    // Example: replace with real API fetch
+    // Example: replace with API fetch
     setSalesData([
       { date: '2026-02-01', amount: 5000 },
       { date: '2026-02-02', amount: 7000 },
@@ -35,10 +35,9 @@ const Dashboard = () => {
     ]);
   }, []);
 
-  // Tooltip formatter to handle undefined safely
-  const tooltipFormatter = (value?: number) => {
-    if (value === undefined) return ['KES 0', ''];
-    return [`KES ${value.toLocaleString()}`, ''];
+  // Formatter for Tooltip (handles undefined safely)
+  const tooltipFormatter = (value?: number): [string, string] => {
+    return [`KES ${value ?? 0}`, ''];
   };
 
   return (
@@ -56,8 +55,8 @@ const Dashboard = () => {
             selected={selectedDate}
             onSelect={setSelectedDate}
             components={{
-              IconLeft: (props) => <ChevronLeft {...props} className="h-4 w-4" />,
-              IconRight: (props) => <ChevronRight {...props} className="h-4 w-4" />,
+              IconLeft: (props: any) => <ChevronLeft {...props} className="h-4 w-4" />,
+              IconRight: (props: any) => <ChevronRight {...props} className="h-4 w-4" />,
             }}
           />
         </div>
