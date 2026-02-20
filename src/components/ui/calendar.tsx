@@ -1,19 +1,22 @@
 // src/components/ui/calendar.tsx
 import React from "react";
 import { DayPicker, DayPickerProps } from "react-day-picker";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import "react-day-picker/dist/style.css";
 
-interface CalendarProps extends DayPickerProps {}
+interface CustomCalendarProps extends Partial<DayPickerProps> {}
 
-export const Calendar: React.FC<CalendarProps> = (props) => {
+export const Calendar: React.FC<CustomCalendarProps> = (props) => {
   return (
-    <DayPicker
-      {...props}
-      components={{
-        IconLeft: ChevronLeft as any,
-        IconRight: ChevronRight as any,
-      }}
-      className="rounded-md border p-2"
-    />
+    <div className="glass-card p-4">
+      <DayPicker
+        {...props}
+        mode="single"
+        showOutsideDays
+        modifiersClassNames={{
+          today: "bg-primary text-primary-foreground rounded-full",
+          selected: "bg-secondary text-secondary-foreground rounded-full",
+        }}
+      />
+    </div>
   );
 };
