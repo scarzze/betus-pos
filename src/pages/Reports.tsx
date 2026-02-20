@@ -1,4 +1,5 @@
 import { BarChart3, TrendingUp, Package, CreditCard, Download } from 'lucide-react';
+import { formatCurrency, formatDate } from '@/lib/utils';
 
 const reportSections = [
   {
