@@ -3,8 +3,8 @@ import React from "react";
 import { DayPicker, DayPickerProps } from "react-day-picker";
 import "react-day-picker/dist/style.css";
 
-// Use a proper interface extending only object types
-export interface CalendarProps extends Partial<DayPickerProps> {}
+// Use type alias instead of interface
+export type CalendarProps = Partial<DayPickerProps>;
 
 export const Calendar: React.FC<CalendarProps> = (props) => {
   return (
