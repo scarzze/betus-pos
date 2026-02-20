@@ -3,11 +3,12 @@ import React from "react";
 import { DayPicker, DayPickerProps } from "react-day-picker";
 import "react-day-picker/dist/style.css";
 
-interface CustomCalendarProps extends Partial<DayPickerProps> {}
+// Use a proper interface extending only object types
+export interface CalendarProps extends Partial<DayPickerProps> {}
 
-export const Calendar: React.FC<CustomCalendarProps> = (props) => {
+export const Calendar: React.FC<CalendarProps> = (props) => {
   return (
-    <div className="glass-card p-4">
+    <div className="p-4 rounded-lg border bg-white shadow-sm">
       <DayPicker
         {...props}
         mode="single"
