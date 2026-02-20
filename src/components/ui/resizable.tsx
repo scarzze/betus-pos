@@ -1,45 +1,33 @@
 import { GripVertical } from "lucide-react";
-import {
-  Panel as ResizablePrimitivePanel,
-  PanelGroup as ResizablePrimitivePanelGroup,
-  PanelResizeHandle as ResizablePrimitivePanelResizeHandle,
-} from "react-resizable-panels";
-
+import { Panel, PanelGroup, PanelResizeHandle } from "@visly/resizable-panels";
 import { cn } from "@/lib/utils";
 
-// Wrapper for PanelGroup
-const ResizablePanelGroup = ({
+export const ResizablePanelGroup = ({
   className,
   ...props
-}: React.ComponentProps<typeof ResizablePrimitivePanelGroup>) => (
-  <ResizablePrimitivePanelGroup
-    className={cn(
-      "flex h-full w-full data-[panel-group-direction=vertical]:flex-col",
-      className
-    )}
+}: React.ComponentProps<typeof PanelGroup>) => (
+  <PanelGroup
+    className={cn("flex h-full w-full flex-row data-[panel-group-direction=vertical]:flex-col", className)}
     {...props}
   />
 );
 
-// Direct export of Panel
-const ResizablePanel = ResizablePrimitivePanel;
+export const ResizablePanel = Panel;
 
-// Panel Resize Handle with optional handle UI
-const ResizableHandle = ({
+export const ResizableHandle = ({
   withHandle,
   className,
   ...props
-}: React.ComponentProps<typeof ResizablePrimitivePanelResizeHandle> & { withHandle?: boolean }) => (
-  <ResizablePrimitivePanelResizeHandle
+}: React.ComponentProps<typeof PanelResizeHandle> & { withHandle?: boolean }) => (
+  <PanelResizeHandle
     className={cn(
       "relative flex w-px items-center justify-center bg-border " +
         "after:absolute after:inset-y-0 after:left-1/2 after:w-1 after:-translate-x-1/2 " +
         "data-[panel-group-direction=vertical]:h-px data-[panel-group-direction=vertical]:w-full " +
         "data-[panel-group-direction=vertical]:after:left-0 data-[panel-group-direction=vertical]:after:h-1 " +
         "data-[panel-group-direction=vertical]:after:w-full data-[panel-group-direction=vertical]:after:-translate-y-1/2 " +
-        "data-[panel-group-direction=vertical]:after:translate-x-0 focus-visible:outline-none " +
-        "focus-visible:ring-1 focus-visible:ring-ring focus-visible:ring-offset-1 " +
-        "[&[data-panel-group-direction=vertical]>div]:rotate-90",
+        "data-[panel-group-direction=vertical]:after:translate-x-0 focus-visible:outline-none focus-visible:ring-1 " +
+        "focus-visible:ring-ring focus-visible:ring-offset-1 [&[data-panel-group-direction=vertical]>div]:rotate-90",
       className
     )}
     {...props}
@@ -49,7 +37,5 @@ const ResizableHandle = ({
         <GripVertical className="h-2.5 w-2.5" />
       </div>
     )}
-  </ResizablePrimitivePanelResizeHandle>
+  </PanelResizeHandle>
 );
-
-export { ResizablePanelGroup, ResizablePanel, ResizableHandle };
