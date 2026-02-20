@@ -5,26 +5,31 @@ import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from "@/componen
 import { WeeklyBarChart, PaymentPieChart } from "@/components/ui/chart";
 import { useAuth } from "@/contexts/AuthContext";
 
+// Dashboard types
 interface Sale {
   id: string;
   total_amount: number;
   profit: number;
   payment_method: string;
   created_at: string;
-  user_id?: string;
 }
 
-interface Product {
+interface UserMetadata {
+  full_name?: string;
+  username?: string;
+}
+
+interface User {
   id: string;
-  name: string;
-  stock: number;
-  low_stock_threshold: number;
-  buying_price: number;
+  email?: string;
+  user_metadata?: UserMetadata;
+  role?: string;
 }
 
 const Dashboard: React.FC = () => {
-  const { user } = useAuth();
-  const isSales = user?.role === "SALES";
+  const { user } = useAuth<User>();
+  const displayName =
+    user?.user_metadata?.full_name ?? user?.user_metadata?.username ?? "User";
 
   const [weeklySales, setWeeklySales] = useState<any[]>([]);
   const [paymentBreakdown, setPaymentBreakdown] = useState<any[]>([]);
@@ -34,29 +39,51 @@ const Dashboard: React.FC = () => {
     todayLoss: 0,
     netRevenue: 0,
     txCount: 0,
-    totalStockValue: 0,
-    lowStockCount: 0,
   });
-
-  const displayName = user?.full_name ?? user?.username ?? "User";
 
   useEffect(() => {
     const fetchDashboard = async () => {
       try {
-        const salesRes = await fetch("/api/sales");
-        const salesData: Sale[] = await salesRes.json();
+        const res = await fetch("/api/sales");
+        const sales: Sale[] = await res.json();
         const today = new Date().toISOString().slice(0, 10);
-        const todaySales = salesData.filter((s) => s.created_at.slice(0, 10) === today);
 
-        const totalSales = todaySales.reduce((sum, r) => sum + r.total_amount, 0);
-        const totalProfit = todaySales.reduce((sum, r) => sum + Math.max(0, r.profit), 0);
-        const totalLoss = todaySales.reduce((sum, r) => sum + Math.abs(Math.min(0, r.profit)), 0);
+        const todaySalesArr = sales.filter(
+          (s) => s.created_at.slice(0, 10) === today
+        );
 
-        const cash = salesData.filter((s) => s.payment_method === "cash").reduce((sum, r) => sum + r.total_amount, 0);
-        const mpesa = salesData.filter((s) => s.payment_method === "mpesa").reduce((sum, r) => sum + r.total_amount, 0);
+        const totalSales = todaySalesArr.reduce(
+          (sum, r) => sum + r.total_amount,
+          0
+        );
+        const totalProfit = todaySalesArr.reduce(
+          (sum, r) => sum + Math.max(0, r.profit),
+          0
+        );
+        const totalLoss = todaySalesArr.reduce(
+          (sum, r) => sum + Math.abs(Math.min(0, r.profit)),
+          0
+        );
 
-        setPaymentBreakdown([{ name: "Cash", value: cash }, { name: "M-Pesa", value: mpesa }]);
-        setStats({ ...stats, todaySales: totalSales, todayProfit: totalProfit, todayLoss: totalLoss, netRevenue: totalSales - totalLoss, txCount: todaySales.length });
+        const cash = sales
+          .filter((s) => s.payment_method === "cash")
+          .reduce((sum, r) => sum + r.total_amount, 0);
+        const mpesa = sales
+          .filter((s) => s.payment_method === "mpesa")
+          .reduce((sum, r) => sum + r.total_amount, 0);
+
+        setPaymentBreakdown([
+          { name: "Cash", value: cash },
+          { name: "M-Pesa", value: mpesa },
+        ]);
+
+        setStats({
+          todaySales: totalSales,
+          todayProfit: totalProfit,
+          todayLoss: totalLoss,
+          netRevenue: totalSales - totalLoss,
+          txCount: todaySalesArr.length,
+        });
 
         const weekly = Array.from({ length: 7 }, (_, i) => {
           const d = new Date();
@@ -64,8 +91,12 @@ const Dashboard: React.FC = () => {
           const dayStr = d.toISOString().slice(0, 10);
           return {
             day: d.toLocaleDateString("en", { weekday: "short" }),
-            sales: salesData.filter((s) => s.created_at.slice(0, 10) === dayStr).reduce((sum, r) => sum + r.total_amount, 0),
-            profit: salesData.filter((s) => s.created_at.slice(0, 10) === dayStr).reduce((sum, r) => sum + r.profit, 0),
+            sales: sales
+              .filter((s) => s.created_at.slice(0, 10) === dayStr)
+              .reduce((sum, r) => sum + r.total_amount, 0),
+            profit: sales
+              .filter((s) => s.created_at.slice(0, 10) === dayStr)
+              .reduce((sum, r) => sum + r.profit, 0),
           };
         });
         setWeeklySales(weekly);
