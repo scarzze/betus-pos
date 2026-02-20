@@ -1,5 +1,6 @@
 import { useLocation } from "react-router-dom";
 import { useEffect } from "react";
+import { formatCurrency, formatDate } from '@/lib/utils';
 
 const NotFound = () => {
   const location = useLocation();
