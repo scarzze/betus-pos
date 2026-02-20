@@ -4,6 +4,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { Zap, Eye, EyeOff, Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import LoadingScreen from '@/components/LoadingScreen';
+import { formatCurrency, formatDate } from '@/lib/utils';
 
 const Login = () => {
   const [email, setEmail] = useState('');
