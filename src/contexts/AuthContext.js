@@ -1,71 +1,73 @@
 import { jsx as _jsx } from "react/jsx-runtime";
 import { createContext, useContext, useState, useCallback, useEffect } from 'react';
+import axios from 'axios';
 const AuthContext = createContext(undefined);
-const mapRole = (dbRole) => {
-    switch (dbRole) {
-        case 'super_admin': return 'SUPER_ADMIN';
-        case 'admin': return 'ADMIN';
-        case 'sales': return 'SALES';
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
+const parseRole = (role) => {
+    switch (role.toUpperCase()) {
+        case 'SUPER_ADMIN': return 'SUPER_ADMIN';
+        case 'ADMIN': return 'ADMIN';
+        case 'SALES': return 'SALES';
         default: return 'SALES';
     }
 };
-const buildUser = async (supaUser) => {
-    const { data: profile } = await supabase
-        .from('profiles')
-        .select('name, email, avatar_url')
-        .eq('user_id', supaUser.id)
-        .single();
-    const { data: roles } = await supabase
-        .from('user_roles')
-        .select('role')
-        .eq('user_id', supaUser.id);
-    const topRole = roles && roles.length > 0
-        ? roles.some(r => r.role === 'super_admin') ? 'super_admin'
-            : roles.some(r => r.role === 'admin') ? 'admin' : 'sales'
-        : 'sales';
-    return {
-        id: supaUser.id,
-        name: profile?.name || supaUser.email?.split('@')[0] || 'User',
-        email: profile?.email || supaUser.email || '',
-        role: mapRole(topRole),
-        avatar: profile?.avatar_url || undefined,
-    };
+// Decode JWT (lightweight, no validation, just payload)
+const decodeJwt = (token) => {
+    try {
+        const payload = token.split('.')[1];
+        return JSON.parse(atob(payload));
+    }
+    catch {
+        return null;
+    }
 };
 export const AuthProvider = ({ children }) => {
     const [user, setUser] = useState(null);
     const [isLoading, setIsLoading] = useState(true);
+    // Load user from localStorage on init
     useEffect(() => {
-        const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
-            if (session?.user) {
-                const appUser = await buildUser(session.user);
-                setUser(appUser);
+        const token = localStorage.getItem('access_token');
+        if (token) {
+            const payload = decodeJwt(token);
+            if (payload) {
+                setUser({
+                    id: payload.sub,
+                    role: parseRole(payload.role),
+                    org: payload.org,
+                    branch: payload.branch,
+                    email: payload.email || '', // optional if backend includes email
+                });
             }
-            else {
-                setUser(null);
-            }
-            setIsLoading(false);
-        });
-        supabase.auth.getSession().then(async ({ data: { session } }) => {
-            if (session?.user) {
-                const appUser = await buildUser(session.user);
-                setUser(appUser);
-            }
-            setIsLoading(false);
-        });
-        return () => subscription.unsubscribe();
+        }
+        setIsLoading(false);
     }, []);
     const login = useCallback(async (email, password) => {
         setIsLoading(true);
-        const { error } = await supabase.auth.signInWithPassword({ email, password });
-        if (error) {
+        try {
+            const res = await axios.post(`${API_URL}/auth/login`, { email, password });
+            const token = res.data.access_token;
+            localStorage.setItem('access_token', token);
+            const payload = decodeJwt(token);
+            if (payload) {
+                setUser({
+                    id: payload.sub,
+                    role: parseRole(payload.role),
+                    org: payload.org,
+                    branch: payload.branch,
+                    email: email,
+                });
+            }
+            setIsLoading(false);
+            return true;
+        }
+        catch (err) {
+            console.error(err);
             setIsLoading(false);
             return false;
         }
-        // onAuthStateChange will handle setting the user
-        return true;
     }, []);
-    const logout = useCallback(async () => {
-        await supabase.auth.signOut();
+    const logout = useCallback(() => {
+        localStorage.removeItem('access_token');
         setUser(null);
     }, []);
     return (_jsx(AuthContext.Provider, { value: { user, isAuthenticated: !!user, isLoading, login, logout }, children: children }));
