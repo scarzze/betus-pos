@@ -2,16 +2,23 @@
 import React from "react";
 import { PanelGroup, Panel, PanelResizeHandle } from "react-resizable-panels";
 
-interface ResizablePanelGroupProps {
+// Props for the group
+interface ResizableGroupProps {
   direction?: "horizontal" | "vertical";
   children: React.ReactNode;
 }
 
-export const ResizablePanelGroup: React.FC<ResizablePanelGroupProps> = ({ direction = "horizontal", children }) => (
-  <PanelGroup direction={direction}>{children}</PanelGroup>
+export const ResizablePanelGroup: React.FC<ResizableGroupProps> = ({
+  direction = "horizontal",
+  children,
+}) => {
+  return <PanelGroup direction={direction}>{children}</PanelGroup>;
+};
+
+export const ResizablePanel: React.FC<{ children: React.ReactNode }> = ({ children }) => (
+  <Panel>{children}</Panel>
 );
 
-export const ResizablePanel: React.FC<{ children: React.ReactNode }> = ({ children }) => <Panel>{children}</Panel>;
-
-export const ResizableHandle: React.FC<{ withHandle?: boolean }> = ({ withHandle = true }) =>
-  withHandle ? <PanelResizeHandle className="bg-border w-1 cursor-col-resize" /> : null;
+export const ResizableHandle: React.FC = () => (
+  <PanelResizeHandle className="bg-border w-1 cursor-col-resize" />
+);
