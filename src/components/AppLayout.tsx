@@ -20,9 +20,8 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
   const location = useLocation();
   const navigate = useNavigate();
 
-  const handleLogout = async () => {
-    await supabase.auth.signOut();
-    logout();
+  const handleLogout = () => {
+    logout(); // supabase removed
     navigate('/login');
   };
 
@@ -35,7 +34,7 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
     { icon: Settings, label: 'Settings', path: '/settings', roles: ['SUPER_ADMIN', 'ADMIN'] },
   ];
 
-  const filteredNav = navItems.filter((item) => user && item.roles.includes(user.role));
+  const filteredNav = navItems.filter(item => user && item.roles.includes(user.role));
 
   const roleColors: Record<string, string> = {
     SUPER_ADMIN: 'bg-primary/20 text-primary',
@@ -59,15 +58,18 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
           )}
         </div>
 
-        {/* Nav */}
+        {/* Navigation */}
         <nav className="flex-1 space-y-1 px-3 py-4">
-          {filteredNav.map((item) => {
+          {filteredNav.map(item => {
             const isActive = location.pathname === item.path;
             return (
-              <Link key={item.path} to={item.path}
+              <Link
+                key={item.path}
+                to={item.path}
                 className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all ${
                   isActive ? 'bg-primary/10 text-primary glow-orange' : 'text-muted-foreground hover:bg-secondary hover:text-foreground'
-                }`}>
+                }`}
+              >
                 <item.icon className={`h-5 w-5 shrink-0 ${isActive ? 'text-primary' : ''}`} />
                 {!collapsed && <span>{item.label}</span>}
               </Link>
@@ -75,25 +77,28 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
           })}
         </nav>
 
-        {/* User section */}
+        {/* User Section */}
         <div className="border-t border-border p-3">
           {!collapsed && user && (
             <div className="mb-3 rounded-lg bg-secondary p-3">
-              <p className="text-sm font-semibold text-foreground">{user.name}</p>
-              <p className="text-xs text-muted-foreground">{user.email}</p>
+              <p className="text-sm font-semibold text-foreground">{user.email}</p>
               <span className={`mt-1.5 inline-block rounded-md px-2 py-0.5 text-[10px] font-bold uppercase ${roleColors[user.role] || ''}`}>
                 {user.role.replace('_', ' ')}
               </span>
             </div>
           )}
           <div className="flex items-center gap-2">
-            <button onClick={() => setCollapsed(!collapsed)}
-              className="flex h-9 w-9 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground">
+            <button
+              onClick={() => setCollapsed(!collapsed)}
+              className="flex h-9 w-9 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
+            >
               {collapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
             </button>
             {!collapsed && (
-              <button onClick={handleLogout}
-                className="flex flex-1 items-center justify-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive">
+              <button
+                onClick={handleLogout}
+                className="flex flex-1 items-center justify-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
+              >
                 <LogOut className="h-4 w-4" />
                 Logout
               </button>
