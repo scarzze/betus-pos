@@ -5,7 +5,6 @@ import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from "@/componen
 import { WeeklyBarChart, PaymentPieChart } from "@/components/ui/chart";
 import { useAuth } from "@/contexts/AuthContext";
 
-// Dashboard types
 interface Sale {
   id: string;
   total_amount: number;
@@ -14,7 +13,7 @@ interface Sale {
   created_at: string;
 }
 
-interface UserMetadata {
+interface UserMeta {
   full_name?: string;
   username?: string;
 }
@@ -22,14 +21,20 @@ interface UserMetadata {
 interface User {
   id: string;
   email?: string;
-  user_metadata?: UserMetadata;
-  role?: string;
+  full_name?: string;
+  username?: string;
+  user_metadata?: UserMeta;
 }
 
 const Dashboard: React.FC = () => {
-  const { user } = useAuth<User>();
+  const { user } = useAuth(); // removed <User>() generic
+
   const displayName =
-    user?.user_metadata?.full_name ?? user?.user_metadata?.username ?? "User";
+    user?.full_name ??
+    user?.username ??
+    user?.user_metadata?.full_name ??
+    user?.user_metadata?.username ??
+    "User";
 
   const [weeklySales, setWeeklySales] = useState<any[]>([]);
   const [paymentBreakdown, setPaymentBreakdown] = useState<any[]>([]);
@@ -48,29 +53,16 @@ const Dashboard: React.FC = () => {
         const sales: Sale[] = await res.json();
         const today = new Date().toISOString().slice(0, 10);
 
-        const todaySalesArr = sales.filter(
-          (s) => s.created_at.slice(0, 10) === today
-        );
+        const todaySalesArr = sales.filter((s) => s.created_at.slice(0, 10) === today);
 
-        const totalSales = todaySalesArr.reduce(
-          (sum, r) => sum + r.total_amount,
-          0
-        );
-        const totalProfit = todaySalesArr.reduce(
-          (sum, r) => sum + Math.max(0, r.profit),
-          0
-        );
-        const totalLoss = todaySalesArr.reduce(
-          (sum, r) => sum + Math.abs(Math.min(0, r.profit)),
-          0
-        );
+        const totalSales = todaySalesArr.reduce((sum, r) => sum + r.total_amount, 0);
+        const totalProfit = todaySalesArr.reduce((sum, r) => sum + Math.max(0, r.profit), 0);
+        const totalLoss = todaySalesArr.reduce((sum, r) => sum + Math.abs(Math.min(0, r.profit)), 0);
 
-        const cash = sales
-          .filter((s) => s.payment_method === "cash")
-          .reduce((sum, r) => sum + r.total_amount, 0);
-        const mpesa = sales
-          .filter((s) => s.payment_method === "mpesa")
-          .reduce((sum, r) => sum + r.total_amount, 0);
+        const cash = sales.filter((s) => s.payment_method === "cash")
+                          .reduce((sum, r) => sum + r.total_amount, 0);
+        const mpesa = sales.filter((s) => s.payment_method === "mpesa")
+                           .reduce((sum, r) => sum + r.total_amount, 0);
 
         setPaymentBreakdown([
           { name: "Cash", value: cash },
@@ -91,12 +83,10 @@ const Dashboard: React.FC = () => {
           const dayStr = d.toISOString().slice(0, 10);
           return {
             day: d.toLocaleDateString("en", { weekday: "short" }),
-            sales: sales
-              .filter((s) => s.created_at.slice(0, 10) === dayStr)
-              .reduce((sum, r) => sum + r.total_amount, 0),
-            profit: sales
-              .filter((s) => s.created_at.slice(0, 10) === dayStr)
-              .reduce((sum, r) => sum + r.profit, 0),
+            sales: sales.filter((s) => s.created_at.slice(0, 10) === dayStr)
+                        .reduce((sum, r) => sum + r.total_amount, 0),
+            profit: sales.filter((s) => s.created_at.slice(0, 10) === dayStr)
+                         .reduce((sum, r) => sum + r.profit, 0),
           };
         });
         setWeeklySales(weekly);
