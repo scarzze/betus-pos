@@ -7,7 +7,12 @@ import { buttonVariants } from "@/components/ui/button";
 
 export type CalendarProps = DayPickerProps;
 
-export function Calendar({ className, classNames, showOutsideDays = true, ...props }: CalendarProps) {
+export function Calendar({
+  className,
+  classNames,
+  showOutsideDays = true,
+  ...props
+}: CalendarProps) {
   return (
     <DayPicker
       showOutsideDays={showOutsideDays}
