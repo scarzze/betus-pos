@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
+import { formatCurrency, formatDate } from '@/lib/utils';
 import {
   DollarSign,
   TrendingUp,
