@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Search, ShoppingCart, X, CreditCard, Banknote, Loader2, CheckCircle, Phone } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
+import { formatCurrency, formatDate } from '@/lib/utils';
 
 interface Product {
   id: string;
