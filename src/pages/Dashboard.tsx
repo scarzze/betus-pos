@@ -75,23 +75,21 @@ const Dashboard = () => {
 
   useEffect(() => {
     const fetchDashboard = async () => {
-      const { data: { user: authUser } } = await supabase.auth.getUser();
-      if (!authUser) return;
-
-      // Recent sales
-      let salesQuery = supabase.from('sales').select('*').order('created_at', { ascending: false }).limit(10);
-      if (isSales) salesQuery = salesQuery.eq('user_id', authUser.id);
-      const { data: salesData } = await salesQuery;
-
-      if (salesData) {
+      try {
+        // Fetch recent sales
+        const salesRes = await fetch('http://localhost:8000/sales');
+        let salesData: any[] = await salesRes.json();
+        if (isSales) {
+          salesData = salesData.filter(s => s.user_id === user?.id);
+        }
         setRecentSales(salesData);
+
         const today = new Date().toISOString().slice(0, 10);
         const todaySales = salesData.filter(s => s.created_at.slice(0, 10) === today);
         const totalSales = todaySales.reduce((s, r) => s + Number(r.total_amount), 0);
         const totalProfit = todaySales.reduce((s, r) => s + Math.max(0, Number(r.profit)), 0);
         const totalLoss = todaySales.reduce((s, r) => s + Math.abs(Math.min(0, Number(r.profit))), 0);
 
-        // Payment breakdown
         const cash = salesData.filter(s => s.payment_method === 'cash').reduce((s, r) => s + Number(r.total_amount), 0);
         const mpesa = salesData.filter(s => s.payment_method === 'mpesa').reduce((s, r) => s + Number(r.total_amount), 0);
         setPaymentBreakdown([
@@ -99,7 +97,6 @@ const Dashboard = () => {
           { name: 'M-Pesa', value: mpesa },
         ]);
 
-        // Weekly sales (last 7 days)
         const days = Array.from({ length: 7 }, (_, i) => {
           const d = new Date();
           d.setDate(d.getDate() - (6 - i));
@@ -120,21 +117,22 @@ const Dashboard = () => {
           netRevenue: totalSales - totalLoss,
           txCount: todaySales.length,
         }));
-      }
 
-      // Products for stock
-      if (!isSales) {
-        const { data: products } = await supabase.from('products').select('*');
-        if (products) {
-          const stockValue = products.reduce((s, p) => s + Number(p.buying_price) * p.stock, 0);
-          const lowStock = products.filter(p => p.stock <= p.low_stock_threshold);
+        // Fetch products for stock
+        if (!isSales) {
+          const productsRes = await fetch('http://localhost:8000/products');
+          const productsData: any[] = await productsRes.json();
+          const stockValue = productsData.reduce((s, p) => s + Number(p.buying_price) * p.stock, 0);
+          const lowStock = productsData.filter(p => p.stock <= p.low_stock_threshold);
           setStats(prev => ({ ...prev, totalStockValue: stockValue, lowStockCount: lowStock.length }));
           setLowStockItems(lowStock.slice(0, 5));
         }
+      } catch (err) {
+        console.error('Dashboard fetch error', err);
       }
     };
     fetchDashboard();
-  }, [isSales]);
+  }, [isSales, user?.id]);
 
   const fmt = (n: number) => `KES ${n.toLocaleString()}`;
 
@@ -186,7 +184,6 @@ const Dashboard = () => {
       {/* Charts */}
       {!isSales && (
         <div className="mb-6 grid gap-6 grid-cols-1 lg:grid-cols-3">
-          {/* Weekly Sales Bar Chart */}
           <div className="glass-card p-5 lg:col-span-2">
             <h3 className="font-display text-base font-semibold text-foreground mb-4">Weekly Sales & Profit</h3>
             <ResponsiveContainer width="100%" height={250}>
@@ -204,7 +201,6 @@ const Dashboard = () => {
             </ResponsiveContainer>
           </div>
 
-          {/* Payment Pie Chart */}
           <div className="glass-card p-5">
             <h3 className="font-display text-base font-semibold text-foreground mb-4">Payment Methods</h3>
             <ResponsiveContainer width="100%" height={250}>
