@@ -43,9 +43,14 @@ const Products = () => {
   const { toast } = useToast();
 
   const fetchProducts = useCallback(async () => {
-    const { data } = await supabase.from('products').select('*').order('name');
-    if (data) setProducts(data);
-    setLoading(false);
+     try {
+    const res = await fetch('http://localhost:8000/products');
+    const data = await res.json();
+    setProducts(data);
+  } catch (err) {
+    console.error(err);
+    toast({ title: 'Error', description: 'Failed to fetch products', variant: 'destructive' });
+  }
   }, []);
 
   useEffect(() => { fetchProducts(); }, [fetchProducts]);
