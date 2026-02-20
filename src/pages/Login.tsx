@@ -10,8 +10,6 @@ const Login = () => {
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [showLoading, setShowLoading] = useState(false);
-  const [isSignUp, setIsSignUp] = useState(false);
-  const [name, setName] = useState('');
   const { login, isLoading } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -19,24 +17,10 @@ const Login = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (isSignUp) {
-      const { error } = await supabase.auth.signUp({
-        email,
-        password,
-        options: { data: { name } },
-      });
-      if (error) {
-        toast({ title: 'Sign Up Failed', description: error.message, variant: 'destructive' });
-      } else {
-        toast({ title: 'Account created!', description: 'You can now sign in.' });
-        setIsSignUp(false);
-      }
-      return;
-    }
-
     const success = await login(email, password);
+
     if (success) {
-      setShowLoading(true);
+      setShowLoading(true); // show loading animation
     } else {
       toast({ title: 'Login Failed', description: 'Invalid email or password.', variant: 'destructive' });
     }
@@ -60,23 +44,8 @@ const Login = () => {
 
         {/* Login Card */}
         <div className="glass-card p-8">
-          <h2 className="mb-6 font-display text-xl font-semibold text-foreground">
-            {isSignUp ? 'Create Account' : 'Sign In'}
-          </h2>
+          <h2 className="mb-6 font-display text-xl font-semibold text-foreground">Sign In</h2>
           <form onSubmit={handleSubmit} className="space-y-5">
-            {isSignUp && (
-              <div>
-                <label className="mb-1.5 block text-sm font-medium text-muted-foreground">Full Name</label>
-                <input
-                  type="text"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  className="w-full rounded-lg border border-border bg-secondary px-4 py-3 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-                  placeholder="Dan Cheru"
-                  required
-                />
-              </div>
-            )}
             <div>
               <label className="mb-1.5 block text-sm font-medium text-muted-foreground">Email</label>
               <input
@@ -117,22 +86,11 @@ const Login = () => {
               {isLoading ? (
                 <>
                   <Loader2 className="h-4 w-4 animate-spin" />
-                  {isSignUp ? 'Creating…' : 'Signing in…'}
+                  Signing in…
                 </>
-              ) : (
-                isSignUp ? 'Create Account' : 'Sign In'
-              )}
+              ) : 'Sign In'}
             </button>
           </form>
-
-          <div className="mt-4 text-center">
-            <button
-              onClick={() => setIsSignUp(!isSignUp)}
-              className="text-sm text-primary hover:underline"
-            >
-              {isSignUp ? 'Already have an account? Sign In' : "Don't have an account? Sign Up"}
-            </button>
-          </div>
         </div>
       </div>
     </div>
