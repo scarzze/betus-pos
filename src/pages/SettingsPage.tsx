@@ -1,5 +1,6 @@
 import { useAuth } from '@/contexts/AuthContext';
 import { Store, Users, CreditCard, Package, Palette, Shield } from 'lucide-react';
+import { formatCurrency, formatDate } from '@/lib/utils';
 
 const settingsSections = [
   {
