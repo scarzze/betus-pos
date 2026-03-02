@@ -10,9 +10,11 @@ class Settings(BaseSettings):
     MPESA_SHORTCODE: str = ""
     MPESA_PASSKEY: str = ""
     MPESA_CALLBACK_URL: str = ""
+    MPESA_ENV: str = "sandbox"
 
     class Config:
         env_file = ".env"
+        extra = "ignore"
 
 
 settings = Settings()
