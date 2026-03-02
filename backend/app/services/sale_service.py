@@ -3,7 +3,7 @@ from app.models.sale import Sale
 from app.models.sale_items import SaleItem
 from app.models.product import Product
 from app.models.imei_records import IMEIRecord
-from app.websocket.manager import manager
+from app.websocket_manager import manager
 from fastapi import HTTPException
 from decimal import Decimal
 

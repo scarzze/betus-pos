@@ -11,10 +11,6 @@ from app.routers import (
     mpesa,
     websocket,
 )
-from app.models.user import User
-from app.core.security import hash_password
-from sqlalchemy.orm import Session
-from app.core.database import SessionLocal
 
 app = FastAPI(
     title="VinLex Electronics POS",
@@ -22,39 +18,18 @@ app = FastAPI(
 )
 
 # ==============================
-# Default Super Admin Seed
-# ==============================
-
-def seed_super_admin():
-    db: Session = SessionLocal()
-    if not db.query(User).filter(User.email == "hydancheru@gmail.com").first():
-        user = User(
-            email="hydancheru@gmail.com",
-            hashed_password=hash_password("DanHacks@2030"),
-            role="SUPER_ADMIN",
-            organization_id=None,
-            branch_id=None,
-            is_active=True
-        )
-        db.add(user)
-        db.commit()
-    db.close()
-
-seed_super_admin()
-# ==============================
-# CORS (for Vercel frontend)
+# CORS (for frontend)
 # ==============================
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # change in production
+    allow_origins=["*"],  # lock down in production
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
 # ==============================
-# Create tables (DEV ONLY)
-# In production use Alembic
+# Create tables (DEV ONLY — use Alembic in production)
 # ==============================
 Base.metadata.create_all(bind=engine)
 
@@ -70,6 +45,33 @@ app.include_router(reports.router, prefix="/api/reports", tags=["Reports"])
 app.include_router(mpesa.router, prefix="/api/mpesa", tags=["M-Pesa"])
 app.include_router(websocket.router)
 
+
 @app.get("/")
 def health_check():
     return {"status": "VinLex Backend Running"}
+
+
+# ==============================
+# Startup: seed super admin
+# ==============================
+@app.on_event("startup")
+def on_startup():
+    from app.models.user import User
+    from app.core.security import hash_password
+    from app.core.database import SessionLocal
+
+    db = SessionLocal()
+    try:
+        if not db.query(User).filter(User.email == "hydancheru@gmail.com").first():
+            user = User(
+                email="hydancheru@gmail.com",
+                hashed_password=hash_password("DanHacks@2030"),
+                role="SUPER_ADMIN",
+                organization_id=None,
+                branch_id=None,
+                is_active=True,
+            )
+            db.add(user)
+            db.commit()
+    finally:
+        db.close()

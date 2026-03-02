@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { Search, ShoppingCart, X, CreditCard, Banknote, Loader2, CheckCircle, Phone } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
-import { formatCurrency, formatDate } from '@/lib/utils';
+import api from '@/lib/api';
 
 interface Product {
   id: string;
@@ -31,13 +31,12 @@ const Sales = () => {
   const { toast } = useToast();
   const isSales = user?.role === 'SALES';
 
-  // Fetch products from FastAPI
+  // Fetch products from backend (with auth)
   useEffect(() => {
     const fetchProducts = async () => {
       try {
-        const res = await fetch('http://localhost:8000/products');
-        const data: Product[] = await res.json();
-        setProducts(data.filter(p => p.stock > 0));
+        const res = await api.get<Product[]>('/products');
+        setProducts(res.data.filter(p => p.stock > 0));
       } catch (err) {
         console.error(err);
         toast({ title: 'Error', description: 'Failed to load products', variant: 'destructive' });
@@ -85,64 +84,45 @@ const Sales = () => {
     try {
       const saleNumber = `S${Date.now().toString(36).toUpperCase()}`;
 
-      // 1. Create sale in backend
-      const saleRes = await fetch('http://localhost:8000/sales', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          sale_number: saleNumber,
-          user_id: user?.id,
-          payment_method: method,
-          total_amount: totalAmount,
-          total_cost: totalCost,
-          profit,
-          status: method === 'mpesa' ? 'pending' : 'completed',
-          items: cart.map(item => ({
-            product_id: item.id,
-            product_name: item.name,
-            quantity: item.qty,
-            selling_price: item.selling_price,
-            buying_price: item.buying_price,
-            subtotal: item.selling_price * item.qty
-          }))
-        })
+      // POST sale — backend handles stock deduction within the same transaction
+      const { data: sale } = await api.post('/sales', {
+        sale_number: saleNumber,
+        user_id: user?.id,
+        payment_method: method,
+        total_amount: totalAmount,
+        total_cost: totalCost,
+        profit,
+        status: method === 'mpesa' ? 'pending' : 'completed',
+        items: cart.map(item => ({
+          product_id: item.id,
+          product_name: item.name,
+          quantity: item.qty,
+          selling_price: item.selling_price,
+          buying_price: item.buying_price,
+          subtotal: item.selling_price * item.qty,
+        })),
       });
-      if (!saleRes.ok) throw new Error('Failed to save sale');
-      const sale = await saleRes.json();
 
-      // 2. Deduct stock
-      for (const item of cart) {
-        await fetch(`http://localhost:8000/products/${item.id}/deduct`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ qty: item.qty })
-        });
-      }
-
-      // 3. Handle M-Pesa STK
+      // Handle M-Pesa STK push
       if (method === 'mpesa' && mpesaPhone) {
         try {
-          await fetch('http://localhost:8000/mpesa/stk', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ phone: mpesaPhone, amount: totalAmount, sale_id: sale.id })
-          });
+          await api.post('/mpesa/stk', { phone: mpesaPhone, amount: totalAmount, sale_id: sale.id });
           toast({ title: '📱 M-Pesa Prompt Sent', description: `Check phone ${mpesaPhone} for payment prompt` });
         } catch {
-          toast({ title: 'M-Pesa Error', description: 'Sale saved but payment failed', variant: 'destructive' });
+          toast({ title: 'M-Pesa Error', description: 'Sale saved but payment prompt failed', variant: 'destructive' });
         }
       }
 
       setCart([]);
-      setCompleting(false);
       setSaleComplete(true);
       setShowMpesaModal(false);
       setMpesaPhone('');
       if (method === 'cash') toast({ title: '✅ Sale Complete', description: `${saleNumber} — KES ${totalAmount.toLocaleString()}` });
       setTimeout(() => setSaleComplete(false), 2000);
     } catch (err: any) {
-      console.error(err);
-      toast({ title: 'Sale Failed', description: err.message || 'Unknown error', variant: 'destructive' });
+      const msg = err.response?.data?.detail || err.message || 'Unknown error';
+      toast({ title: 'Sale Failed', description: msg, variant: 'destructive' });
+    } finally {
       setCompleting(false);
     }
   };
@@ -167,20 +147,26 @@ const Sales = () => {
           <input type="text" value={search} onChange={e => setSearch(e.target.value)} placeholder="Search products…"
             className="w-full rounded-lg border border-border bg-secondary pl-10 pr-4 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary" />
         </div>
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-4">
-          {filteredProducts.map(product => (
-            <button key={product.id} onClick={() => addToCart(product)}
-              className="glass-card p-4 text-left transition-all hover:border-primary/40 hover:glow-orange">
-              <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
-                <ShoppingCart className="h-5 w-5 text-primary" />
-              </div>
-              <p className="text-sm font-medium text-foreground leading-tight">{product.name}</p>
-              <p className="mt-1 font-display text-lg font-bold text-primary">KES {product.selling_price.toLocaleString()}</p>
-              {!isSales && <p className="text-xs text-muted-foreground">Buy: KES {product.buying_price.toLocaleString()}</p>}
-              <p className="text-xs text-muted-foreground">{product.stock} in stock</p>
-            </button>
-          ))}
-        </div>
+        {filteredProducts.length === 0 ? (
+          <div className="flex h-48 items-center justify-center text-muted-foreground">
+            <p className="text-sm">{search ? 'No products match your search.' : 'No products in stock.'}</p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-4">
+            {filteredProducts.map(product => (
+              <button key={product.id} onClick={() => addToCart(product)}
+                className="glass-card p-4 text-left transition-all hover:border-primary/40 hover:glow-orange">
+                <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
+                  <ShoppingCart className="h-5 w-5 text-primary" />
+                </div>
+                <p className="text-sm font-medium text-foreground leading-tight">{product.name}</p>
+                <p className="mt-1 font-display text-lg font-bold text-primary">KES {product.selling_price.toLocaleString()}</p>
+                {!isSales && <p className="text-xs text-muted-foreground">Buy: KES {product.buying_price.toLocaleString()}</p>}
+                <p className="text-xs text-muted-foreground">{product.stock} in stock</p>
+              </button>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Cart Panel */}

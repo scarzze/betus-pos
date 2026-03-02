@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Search, Plus, Filter, Package, Pencil, Trash2, X, Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { formatCurrency, formatDate } from '@/lib/utils';
+import api from '@/lib/api';
 
 interface Product {
   id: string;
@@ -45,9 +45,8 @@ const Products = () => {
   const fetchProducts = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await fetch('http://localhost:8000/products');
-      const data = await res.json();
-      setProducts(data);
+      const res = await api.get<Product[]>('/products');
+      setProducts(res.data);
     } catch (err) {
       console.error(err);
       toast({ title: 'Error', description: 'Failed to fetch products', variant: 'destructive' });
@@ -97,55 +96,30 @@ const Products = () => {
 
     try {
       if (editingId) {
-        const res = await fetch(`http://localhost:8000/products/${editingId}`, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload),
-        });
-        if (!res.ok) {
-          const err = await res.json();
-          toast({ title: 'Error', description: err.error || 'Failed to update product', variant: 'destructive' });
-        } else {
-          toast({ title: '✅ Product Updated' });
-        }
+        await api.put(`/products/${editingId}`, payload);
+        toast({ title: '✅ Product Updated' });
       } else {
-        const res = await fetch('http://localhost:8000/products', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload),
-        });
-        if (!res.ok) {
-          const err = await res.json();
-          toast({ title: 'Error', description: err.error || 'Failed to add product', variant: 'destructive' });
-        } else {
-          toast({ title: '✅ Product Added' });
-        }
+        await api.post('/products', payload);
+        toast({ title: '✅ Product Added' });
       }
-    } catch (err) {
-      console.error(err);
-      toast({ title: 'Error', description: 'Something went wrong', variant: 'destructive' });
+      setShowModal(false);
+      fetchProducts();
+    } catch (err: any) {
+      const msg = err.response?.data?.detail || 'Something went wrong';
+      toast({ title: 'Error', description: msg, variant: 'destructive' });
+    } finally {
+      setSaving(false);
     }
-
-    setSaving(false);
-    setShowModal(false);
-    fetchProducts();
   };
 
   const handleDelete = async (id: string) => {
     try {
-      const res = await fetch(`http://localhost:8000/products/${id}`, {
-        method: 'DELETE',
-      });
-      if (!res.ok) {
-        const err = await res.json();
-        toast({ title: 'Error', description: err.error || 'Failed to delete product', variant: 'destructive' });
-      } else {
-        toast({ title: '✅ Product Deleted' });
-        fetchProducts();
-      }
-    } catch (err) {
-      console.error(err);
-      toast({ title: 'Error', description: 'Something went wrong', variant: 'destructive' });
+      await api.delete(`/products/${id}`);
+      toast({ title: '✅ Product Deleted' });
+      fetchProducts();
+    } catch (err: any) {
+      const msg = err.response?.data?.detail || 'Failed to delete product';
+      toast({ title: 'Error', description: msg, variant: 'destructive' });
     }
   };
 
@@ -201,7 +175,13 @@ const Products = () => {
               </tr>
             </thead>
             <tbody>
-              {filtered.map(product => {
+              {filtered.length === 0 ? (
+                <tr>
+                  <td colSpan={8} className="px-4 py-12 text-center text-sm text-muted-foreground">
+                    {search ? 'No products match your search.' : 'No products yet. Click "Add Product" to get started.'}
+                  </td>
+                </tr>
+              ) : filtered.map(product => {
                 const margin = product.selling_price > 0 ? ((product.selling_price - product.buying_price) / product.selling_price * 100).toFixed(1) : '0';
                 const isLowStock = product.stock <= product.low_stock_threshold;
                 return (
