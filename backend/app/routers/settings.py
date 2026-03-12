@@ -9,7 +9,7 @@ from app.core.rbac import require_roles
 router = APIRouter()
 
 
-@router.get("/", response_model=SettingsOut)
+@router.get("", response_model=SettingsOut)
 def read_settings(
     db: Session = Depends(get_db),
     user=Depends(require_roles(["SUPER_ADMIN", "ADMIN"]))
@@ -18,7 +18,7 @@ def read_settings(
     return settings
 
 
-@router.put("/", response_model=SettingsOut)
+@router.put("", response_model=SettingsOut)
 def modify_settings(
     settings_data: SettingsBase,
     db: Session = Depends(get_db),

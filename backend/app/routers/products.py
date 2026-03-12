@@ -20,7 +20,7 @@ router = APIRouter()
 
 
 # ─── List all products (org-scoped from JWT) ──────────────────────────────────
-@router.get("/", response_model=list[ProductOut])
+@router.get("", response_model=list[ProductOut])
 def list_all_products(
     db: Session = Depends(get_db),
     user=Depends(require_roles(["SUPER_ADMIN", "ADMIN", "SALES"]))
@@ -31,7 +31,7 @@ def list_all_products(
 
 
 # ─── Add product ──────────────────────────────────────────────────────────────
-@router.post("/", response_model=ProductOut)
+@router.post("", response_model=ProductOut)
 def add_product(
     product: ProductCreate,
     db: Session = Depends(get_db),

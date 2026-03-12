@@ -11,7 +11,7 @@ router = APIRouter()
 
 
 # ─── List users for the caller's org ─────────────────────────────────────────
-@router.get("/", response_model=list[UserOut])
+@router.get("", response_model=list[UserOut])
 def list_users(
     db: Session = Depends(get_db),
     current_user=Depends(require_roles(["SUPER_ADMIN", "ADMIN"]))
@@ -23,7 +23,7 @@ def list_users(
 
 
 # ─── Create a new user ────────────────────────────────────────────────────────
-@router.post("/", response_model=UserOut)
+@router.post("", response_model=UserOut)
 def create_new_user(
     user: UserCreate,
     db: Session = Depends(get_db),

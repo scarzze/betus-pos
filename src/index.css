@@ -1,68 +1,231 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+
+/* ─── Reset & Base ─────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
 :root {
-  font-family: system-ui, Avenir, Helvetica, Arial, sans-serif;
-  line-height: 1.5;
-  font-weight: 400;
-
-  color-scheme: light dark;
-  color: rgba(255, 255, 255, 0.87);
-  background-color: #242424;
-
+  --betus-bg:        #0a0a14;
+  --betus-surface:   rgba(255,255,255,0.055);
+  --betus-border:    rgba(255,255,255,0.10);
+  --betus-text:      #f0f0f8;
+  --betus-muted:     #8b8ca8;
+  --betus-primary:   #6366f1;
+  --betus-primary2:  #8b5cf6;
+  --betus-glow:      rgba(99,102,241,0.35);
+  --betus-input-bg:  rgba(255,255,255,0.04);
+  --betus-radius:    14px;
+  font-family: 'Inter', system-ui, sans-serif;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-}
-
-a {
-  font-weight: 500;
-  color: #646cff;
-  text-decoration: inherit;
-}
-a:hover {
-  color: #535bf2;
 }
 
 body {
-  margin: 0;
-  display: flex;
-  place-items: center;
-  min-width: 320px;
+  background: var(--betus-bg);
+  color: var(--betus-text);
   min-height: 100vh;
+  min-width: 320px;
 }
 
-h1 {
-  font-size: 3.2em;
-  line-height: 1.1;
+/* ─── Login Root ───────────────────────────────────────── */
+.betus-login-root {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  padding: 1.5rem;
+  overflow: hidden;
+  background: radial-gradient(ellipse at 20% 50%, rgba(99,102,241,0.15) 0%, transparent 60%),
+              radial-gradient(ellipse at 80% 20%, rgba(139,92,246,0.12) 0%, transparent 55%),
+              var(--betus-bg);
 }
 
-button {
-  border-radius: 8px;
-  border: 1px solid transparent;
-  padding: 0.6em 1.2em;
-  font-size: 1em;
+/* ─── Animated blobs ───────────────────────────────────── */
+.betus-blob {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(80px);
+  opacity: 0.22;
+  pointer-events: none;
+  animation: betus-float 8s ease-in-out infinite alternate;
+}
+.betus-blob-1 {
+  width: 500px; height: 500px;
+  top: -120px; left: -120px;
+  background: radial-gradient(circle, #6366f1, #4f46e5);
+  animation-duration: 9s;
+}
+.betus-blob-2 {
+  width: 400px; height: 400px;
+  bottom: -100px; right: -80px;
+  background: radial-gradient(circle, #8b5cf6, #7c3aed);
+  animation-duration: 11s; animation-delay: -3s;
+}
+.betus-blob-3 {
+  width: 300px; height: 300px;
+  top: 40%; left: 55%;
+  background: radial-gradient(circle, #a78bfa, #6366f1);
+  animation-duration: 14s; animation-delay: -6s;
+  opacity: 0.12;
+}
+@keyframes betus-float {
+  from { transform: translate(0, 0) scale(1); }
+  to   { transform: translate(30px, 20px) scale(1.06); }
+}
+
+/* ─── Card ─────────────────────────────────────────────── */
+.betus-login-card {
+  position: relative;
+  z-index: 10;
+  width: 100%; max-width: 420px;
+  animation: betus-slide-up 0.55s cubic-bezier(.16,1,.3,1) both;
+}
+@keyframes betus-slide-up {
+  from { opacity: 0; transform: translateY(28px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* ─── Brand Section ────────────────────────────────────── */
+.betus-brand {
+  text-align: center;
+  margin-bottom: 2rem;
+}
+.betus-logo {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 1rem;
+  filter: drop-shadow(0 0 20px rgba(99,102,241,0.6));
+  animation: betus-pulse 3s ease-in-out infinite;
+}
+@keyframes betus-pulse {
+  0%, 100% { filter: drop-shadow(0 0 18px rgba(99,102,241,0.5)); }
+  50%       { filter: drop-shadow(0 0 32px rgba(139,92,246,0.8)); }
+}
+.betus-logo-svg {
+  width: 64px; height: 64px;
+}
+.betus-title {
+  font-size: 2rem;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  background: linear-gradient(135deg, #a5b4fc 0%, #818cf8 40%, #c4b5fd 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+.betus-subtitle {
+  font-size: 0.82rem;
   font-weight: 500;
-  font-family: inherit;
-  background-color: #1a1a1a;
-  cursor: pointer;
-  transition: border-color 0.25s;
-}
-button:hover {
-  border-color: #646cff;
-}
-button:focus,
-button:focus-visible {
-  outline: 4px auto -webkit-focus-ring-color;
+  color: var(--betus-muted);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  margin-top: 0.25rem;
 }
 
-@media (prefers-color-scheme: light) {
-  :root {
-    color: #213547;
-    background-color: #ffffff;
-  }
-  a:hover {
-    color: #747bff;
-  }
-  button {
-    background-color: #f9f9f9;
-  }
+/* ─── Form Wrapper ─────────────────────────────────────── */
+.betus-form-wrapper {
+  background: var(--betus-surface);
+  border: 1px solid var(--betus-border);
+  border-radius: 20px;
+  padding: 2.25rem 2rem;
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  box-shadow: 0 8px 40px rgba(0,0,0,0.4), 0 0 0 1px rgba(255,255,255,0.06) inset;
+}
+.betus-welcome {
+  font-size: 1.3rem;
+  font-weight: 700;
+  color: var(--betus-text);
+  margin-bottom: 0.25rem;
+}
+.betus-welcome-sub {
+  font-size: 0.84rem;
+  color: var(--betus-muted);
+  margin-bottom: 1.75rem;
+}
+
+/* ─── Form Fields ──────────────────────────────────────── */
+.betus-form { display: flex; flex-direction: column; gap: 1.1rem; }
+.betus-field { display: flex; flex-direction: column; gap: 0.45rem; }
+.betus-label {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--betus-muted);
+  letter-spacing: 0.02em;
+}
+.betus-input {
+  width: 100%;
+  background: var(--betus-input-bg);
+  border: 1px solid var(--betus-border);
+  border-radius: var(--betus-radius);
+  padding: 0.75rem 1rem;
+  font-size: 0.9rem;
+  font-family: inherit;
+  color: var(--betus-text);
+  outline: none;
+  transition: border-color 0.2s, box-shadow 0.2s, background 0.2s;
+}
+.betus-input::placeholder { color: rgba(139,140,168,0.5); }
+.betus-input:focus {
+  border-color: var(--betus-primary);
+  background: rgba(99,102,241,0.06);
+  box-shadow: 0 0 0 3px var(--betus-glow);
+}
+.betus-input-wrap { position: relative; }
+.betus-input-padded { padding-right: 2.75rem; }
+.betus-eye-btn {
+  position: absolute;
+  right: 0.85rem;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  padding: 0;
+  color: var(--betus-muted);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  transition: color 0.2s;
+}
+.betus-eye-btn:hover { color: var(--betus-text); }
+
+/* ─── Submit Button ────────────────────────────────────── */
+.betus-submit-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  width: 100%;
+  margin-top: 0.4rem;
+  padding: 0.82rem 1rem;
+  border: none;
+  border-radius: var(--betus-radius);
+  background: linear-gradient(135deg, var(--betus-primary) 0%, var(--betus-primary2) 100%);
+  color: #fff;
+  font-family: inherit;
+  font-size: 0.92rem;
+  font-weight: 700;
+  cursor: pointer;
+  letter-spacing: 0.02em;
+  box-shadow: 0 4px 20px rgba(99,102,241,0.45);
+  transition: opacity 0.2s, transform 0.15s, box-shadow 0.2s;
+}
+.betus-submit-btn:hover:not(:disabled) {
+  opacity: 0.92;
+  transform: translateY(-1px);
+  box-shadow: 0 6px 28px rgba(99,102,241,0.6);
+}
+.betus-submit-btn:active:not(:disabled) { transform: translateY(0); }
+.betus-submit-btn:disabled { opacity: 0.55; cursor: not-allowed; }
+.betus-spin { animation: spin 0.9s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ─── Footer ───────────────────────────────────────────── */
+.betus-footer-text {
+  margin-top: 1.5rem;
+  text-align: center;
+  font-size: 0.75rem;
+  color: rgba(139,140,168,0.45);
 }

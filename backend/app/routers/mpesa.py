@@ -4,7 +4,7 @@ from app.core.database import get_db
 from app.services.mpesa_service import stk_push
 from app.models.sale import Sale
 from app.models.payment import Payment
-from app.websocket.manager import manager
+from app.websocket_manager import manager
 from uuid import UUID
 
 router = APIRouter()

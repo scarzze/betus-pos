@@ -14,7 +14,9 @@
     "resolveJsonModule": true,
     "allowSyntheticDefaultImports": true,
     "isolatedModules": true,               // required by Vite + TSX
+    "allowImportingTsExtensions": true,     // allow .tsx extension in imports
     "baseUrl": ".",
+    "noEmit": true,
     "paths": {
       "@/*": ["src/*"]
     }

@@ -13,7 +13,7 @@ router = APIRouter()
 
 
 # ─── Create a new sale ────────────────────────────────────────────────────────
-@router.post("/", response_model=SaleOut)
+@router.post("", response_model=SaleOut)
 def new_sale(
     sale_data: SaleCreate,
     db: Session = Depends(get_db),
@@ -62,7 +62,7 @@ def new_sale(
 
 
 # ─── List all sales for this org ──────────────────────────────────────────────
-@router.get("/", response_model=list[SaleOut])
+@router.get("", response_model=list[SaleOut])
 def list_all_sales(
     db: Session = Depends(get_db),
     user=Depends(require_roles(["SUPER_ADMIN", "ADMIN", "SALES"]))

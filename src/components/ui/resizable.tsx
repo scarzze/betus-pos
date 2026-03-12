@@ -1,6 +1,6 @@
 // src/components/ui/resizable.tsx
 import React from "react";
-import { PanelGroup, Panel, PanelResizeHandle } from "react-resizable-panels";
+import { Group, Panel, Separator } from "react-resizable-panels";
 
 interface ResizableGroupProps {
   direction?: "horizontal" | "vertical";
@@ -10,12 +10,12 @@ interface ResizableGroupProps {
 export const ResizablePanelGroup: React.FC<ResizableGroupProps> = ({
   direction = "horizontal",
   children,
-}) => <PanelGroup direction={direction}>{children}</PanelGroup>;
+}) => <Group orientation={direction}>{children}</Group>;
 
 export const ResizablePanel: React.FC<{ children: React.ReactNode }> = ({ children }) => (
   <Panel>{children}</Panel>
 );
 
 export const ResizableHandle: React.FC = () => (
-  <PanelResizeHandle className="bg-border w-1 cursor-col-resize" />
+  <Separator className="bg-border w-1 cursor-col-resize" />
 );

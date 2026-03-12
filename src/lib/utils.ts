@@ -43,7 +43,7 @@ export function generateReceipt(sale: {
   date: string;
 }) {
   const lines = [
-    "=== VinLex Electronics POS ===",
+    "=== Betus POS ===",
     `Receipt #: ${sale.id}`,
     `Date: ${formatDate(sale.date)}`,
     sale.customer ? `Customer: ${sale.customer}` : "",
