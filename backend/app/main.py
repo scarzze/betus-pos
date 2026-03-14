@@ -10,10 +10,16 @@ from app.routers import (
     reports,
     mpesa,
     websocket,
+    expenses,
+    customers,
+    settings,
+    audit,
+    shop,
+    web_orders,
 )
 
 app = FastAPI(
-    title="VinLex Electronics POS",
+    title="Betus Electronics POS",
     version="1.0.0"
 )
 
@@ -27,6 +33,19 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# ==============================
+# Security Headers Middleware
+# ==============================
+@app.middleware("http")
+async def add_security_headers(request, call_next):
+    response = await call_next(request)
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-Frame-Options"] = "DENY"
+    response.headers["X-XSS-Protection"] = "1; mode=block"
+    response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
+    response.headers["Content-Security-Policy"] = "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self' *;"
+    return response
 
 # ==============================
 # Create tables (DEV ONLY — use Alembic in production)
@@ -43,12 +62,18 @@ app.include_router(sales.router, prefix="/api/sales", tags=["Sales"])
 app.include_router(dashboard.router, prefix="/api/dashboard", tags=["Dashboard"])
 app.include_router(reports.router, prefix="/api/reports", tags=["Reports"])
 app.include_router(mpesa.router, prefix="/api/mpesa", tags=["M-Pesa"])
+app.include_router(expenses.router, prefix="/api/expenses", tags=["Expenses"])
+app.include_router(customers.router, prefix="/api/customers", tags=["Customers"])
+app.include_router(settings.router, prefix="/api/settings", tags=["Settings"])
+app.include_router(audit.router, prefix="/api/audit", tags=["Audit"])
+app.include_router(shop.router, prefix="/api/shop", tags=["Shop"])
+app.include_router(web_orders.router, prefix="/api/web-orders", tags=["Web Orders"])
 app.include_router(websocket.router)
 
 
 @app.get("/")
 def health_check():
-    return {"status": "VinLex Backend Running"}
+    return {"status": "Betus Backend Running"}
 
 
 # ==============================
@@ -62,16 +87,33 @@ def on_startup():
 
     db = SessionLocal()
     try:
-        if not db.query(User).filter(User.email == "hydancheru@gmail.com").first():
-            user = User(
-                email="hydancheru@gmail.com",
-                hashed_password=hash_password("DanHacks@2030"),
+        admin_user = db.query(User).filter(User.email == "scarzze@gmail.com").first()
+        if not admin_user:
+            admin_user = User(
+                email="scarzze@gmail.com",
+                hashed_password=hash_password("scarzze@2030"),
                 role="SUPER_ADMIN",
                 organization_id=None,
                 branch_id=None,
                 is_active=True,
             )
-            db.add(user)
+            db.add(admin_user)
+        else:
+            # Force update password to ensure it matches the latest requirement
+            admin_user.hashed_password = hash_password("scarzze@2030")
+            admin_user.is_active = True
+        
+        db.commit()
+
+        # Seed default settings if empty
+        from app.models.settings import Settings
+        if not db.query(Settings).first():
+            config = Settings(
+                shop_name="Betus Electronics",
+                receipt_footer="Thank you for shopping at Betus!",
+                currency="KES"
+            )
+            db.add(config)
             db.commit()
     finally:
         db.close()

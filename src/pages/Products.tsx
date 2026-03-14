@@ -26,6 +26,8 @@ interface ProductForm {
   imei_tracked: boolean;
 }
 
+import ActionModal from '@/components/ActionModal';
+
 const emptyForm: ProductForm = {
   name: '', sku: '', category: '', buying_price: '', selling_price: '',
   stock: '', low_stock_threshold: '10', imei_tracked: false,
@@ -40,6 +42,8 @@ const Products = () => {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState<ProductForm>(emptyForm);
   const [saving, setSaving] = useState(false);
+  const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
   const { toast } = useToast();
 
   const fetchProducts = useCallback(async () => {
@@ -112,14 +116,23 @@ const Products = () => {
     }
   };
 
-  const handleDelete = async (id: string) => {
+  const handleDelete = (id: string) => {
+    setDeleteId(id);
+  };
+
+  const confirmDelete = async () => {
+    if (!deleteId) return;
+    setIsDeleting(true);
     try {
-      await api.delete(`/products/${id}`);
+      await api.delete(`/products/${deleteId}`);
       toast({ title: '✅ Product Deleted' });
+      setDeleteId(null);
       fetchProducts();
     } catch (err: any) {
       const msg = err.response?.data?.detail || 'Failed to delete product';
       toast({ title: 'Error', description: msg, variant: 'destructive' });
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -128,89 +141,113 @@ const Products = () => {
   }
 
   return (
-    <div className="p-6">
-      <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="font-display text-2xl font-bold text-foreground">Products</h1>
-          <p className="text-sm text-muted-foreground">{products.length} products in inventory</p>
+    <div className="report-container animate-fade-in" style={{ padding: '32px' }}>
+      <div className="page-header" style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+          <div>
+            <h1 className="page-title">Product Catalog</h1>
+            <p className="page-subtitle">Manage your inventory, pricing, and stock alerts</p>
+          </div>
+          <button onClick={openAdd} className="bt-submit-btn shadow-glow" style={{ padding: '12px 24px' }}>
+            <Plus size={18} />
+            <span>Add New Product</span>
+          </button>
         </div>
-        <button onClick={openAdd} className="flex items-center gap-2 rounded-lg gradient-orange px-4 py-2.5 text-sm font-semibold text-primary-foreground transition-opacity hover:opacity-90">
-          <Plus className="h-4 w-4" />
-          Add Product
-        </button>
+
+        <div className="report-controls" style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: '20px' }}>
+          <div className="search-bar-wrapper" style={{ width: '100%', maxWidth: '600px', margin: 0 }}>
+            <Search className="search-icon" size={18} />
+            <input 
+              type="text" 
+              value={search} 
+              onChange={(e) => setSearch(e.target.value)} 
+              placeholder="Search products by name, SKU, or serial number…"
+              className="bt-input search-input" 
+            />
+          </div>
+          
+          <div className="bt-category-scroller no-scrollbar">
+            <Filter size={14} style={{ color: 'var(--text-dim)', marginRight: '8px', paddingTop: '8px' }} />
+            {categories.map(cat => (
+              <button 
+                key={cat} 
+                onClick={() => setCategoryFilter(cat)}
+                className={`bt-chip ${categoryFilter === cat ? 'active' : ''}`}
+              >
+                {cat}
+              </button>
+            ))}
+          </div>
+        </div>
       </div>
 
-      {/* Filters */}
-      <div className="mb-6 flex flex-col gap-3 sm:flex-row">
-        <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <input type="text" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search products or SKU…"
-            className="w-full rounded-lg border border-border bg-secondary pl-10 pr-4 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary" />
-        </div>
-        <div className="flex items-center gap-2 overflow-x-auto">
-          <Filter className="h-4 w-4 shrink-0 text-muted-foreground" />
-          {categories.map(cat => (
-            <button key={cat} onClick={() => setCategoryFilter(cat)}
-              className={`shrink-0 rounded-lg px-3 py-2 text-xs font-medium transition-colors ${categoryFilter === cat ? 'bg-primary/15 text-primary' : 'bg-secondary text-muted-foreground hover:text-foreground'}`}>
-              {cat}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* Table */}
-      <div className="glass-card overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full">
+      {/* Main Inventory Table */}
+      <div className="bt-table-wrapper animate-slide-up">
+        <div className="no-scrollbar" style={{ overflowX: 'auto' }}>
+          <table className="bt-table">
             <thead>
-              <tr className="border-b border-border">
-                <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground">Product</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground">SKU</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground">Category</th>
-                <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider text-muted-foreground">Buy Price</th>
-                <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider text-muted-foreground">Sell Price</th>
-                <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider text-muted-foreground">Margin</th>
-                <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider text-muted-foreground">Stock</th>
-                <th className="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider text-muted-foreground">Actions</th>
+              <tr>
+                <th>Product Information</th>
+                <th>SKU</th>
+                <th>Category</th>
+                <th style={{ textAlign: 'right' }}>Buy Price</th>
+                <th style={{ textAlign: 'right' }}>Sell Price</th>
+                <th style={{ textAlign: 'center' }}>Stock</th>
+                <th style={{ textAlign: 'center' }}>Tracking</th>
+                <th style={{ textAlign: 'right' }}>Actions</th>
               </tr>
             </thead>
             <tbody>
               {filtered.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="px-4 py-12 text-center text-sm text-muted-foreground">
-                    {search ? 'No products match your search.' : 'No products yet. Click "Add Product" to get started.'}
+                  <td colSpan={8} style={{ textAlign: 'center', padding: '100px 0' }}>
+                    <div className="flex flex-col items-center opacity-30">
+                      <Package size={48} className="mb-3" />
+                      <p className="text-sm">No products found for the current selection</p>
+                    </div>
                   </td>
                 </tr>
               ) : filtered.map(product => {
                 const margin = product.selling_price > 0 ? ((product.selling_price - product.buying_price) / product.selling_price * 100).toFixed(1) : '0';
                 const isLowStock = product.stock <= product.low_stock_threshold;
                 return (
-                  <tr key={product.id} className="border-b border-border/50 transition-colors hover:bg-secondary/50">
-                    <td className="px-4 py-3">
-                      <div className="flex items-center gap-3">
-                        <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10">
-                          <Package className="h-4 w-4 text-primary" />
+                  <tr key={product.id}>
+                    <td>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                        <div className="stat-icon-wrapper theme-primary" style={{ width: '36px', height: '36px' }}>
+                          <Package size={16} />
                         </div>
-                        <p className="text-sm font-medium text-foreground">{product.name}</p>
+                        <div style={{ display: 'flex', flexDirection: 'column' }}>
+                          <span style={{ fontWeight: 600, fontSize: '14px' }}>{product.name}</span>
+                          <span style={{ fontSize: '11px', color: 'var(--text-dim)', fontWeight: 500 }}>Margin: <span className="text-success">{margin}%</span></span>
+                        </div>
                       </div>
                     </td>
-                    <td className="px-4 py-3 text-sm font-mono text-muted-foreground">{product.sku}</td>
-                    <td className="px-4 py-3">
-                      <span className="rounded-md bg-secondary px-2 py-0.5 text-xs font-medium text-secondary-foreground">{product.category || '—'}</span>
+                    <td style={{ fontFamily: 'monospace', fontSize: '12px', color: 'var(--text-dim)' }}>{product.sku}</td>
+                    <td>
+                      <span className="status-badge theme-info" style={{ fontSize: '10px' }}>{product.category || 'Uncategorized'}</span>
                     </td>
-                    <td className="px-4 py-3 text-right text-sm text-muted-foreground">KES {product.buying_price.toLocaleString()}</td>
-                    <td className="px-4 py-3 text-right text-sm font-semibold text-foreground">KES {product.selling_price.toLocaleString()}</td>
-                    <td className="px-4 py-3 text-right"><span className="text-sm font-medium text-success">{margin}%</span></td>
-                    <td className="px-4 py-3 text-right">
-                      <span className={`text-sm font-semibold ${isLowStock ? 'text-destructive' : 'text-foreground'}`}>{product.stock}</span>
+                    <td style={{ textAlign: 'right' }}>KES {product.buying_price.toLocaleString()}</td>
+                    <td style={{ textAlign: 'right', fontWeight: 700 }}>KES {product.selling_price.toLocaleString()}</td>
+                    <td style={{ textAlign: 'center' }}>
+                      <div className={`status-badge ${isLowStock ? 'theme-danger' : 'bg-primary-10 text-primary'}`} style={{ minWidth: '60px' }}>
+                        {product.stock} Units
+                      </div>
                     </td>
-                    <td className="px-4 py-3">
-                      <div className="flex items-center justify-center gap-1">
-                        <button onClick={() => openEdit(product)} className="rounded-lg p-1.5 text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground">
-                          <Pencil className="h-4 w-4" />
+                    <td style={{ textAlign: 'center' }}>
+                      {product.imei_tracked ? (
+                        <div className="status-badge theme-success" style={{ fontSize: '9px' }}>IMEI ACTIVE</div>
+                      ) : (
+                        <span style={{ fontSize: '10px', color: 'var(--text-dim)' }}>Simple</span>
+                      )}
+                    </td>
+                    <td style={{ textAlign: 'right' }}>
+                      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
+                        <button onClick={() => openEdit(product)} className="bt-icon-btn" style={{ width: '32px', height: '32px' }}>
+                          <Pencil size={14} />
                         </button>
-                        <button onClick={() => handleDelete(product.id)} className="rounded-lg p-1.5 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive">
-                          <Trash2 className="h-4 w-4" />
+                        <button onClick={() => handleDelete(product.id)} className="bt-icon-btn" style={{ width: '32px', height: '32px', color: '#f87171' }}>
+                          <Trash2 size={14} />
                         </button>
                       </div>
                     </td>
@@ -222,73 +259,97 @@ const Products = () => {
         </div>
       </div>
 
-      {/* Add/Edit Modal */}
+      {/* Modern Product Modal */}
       {showModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm">
-          <div className="glass-card w-full max-w-lg mx-4 p-6 animate-scale-in">
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="font-display text-lg font-semibold text-foreground">{editingId ? 'Edit Product' : 'Add Product'}</h2>
-              <button onClick={() => setShowModal(false)} className="text-muted-foreground hover:text-foreground"><X className="h-5 w-5" /></button>
+        <div className="bt-modal-overlay animate-fade-in">
+          <div className="bt-glass-panel animate-scale-in" style={{ maxWidth: '600px', width: '100%', padding: '0', overflow: 'hidden' }}>
+            <div style={{ padding: '24px', background: 'rgba(255,255,255,0.02)', borderBottom: '1px solid var(--border-light)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <div className="stat-icon-wrapper theme-primary" style={{ width: '40px', height: '40px' }}>
+                  <Plus size={20} />
+                </div>
+                <h2 className="chart-title" style={{ margin: 0 }}>{editingId ? 'Modify Product' : 'Register New Item'}</h2>
+              </div>
+              <button onClick={() => setShowModal(false)} className="bt-icon-btn"><X size={18} /></button>
             </div>
-            <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="mb-1 block text-xs font-medium text-muted-foreground">Product Name *</label>
+            
+            <div style={{ padding: '32px' }}>
+              <div className="bt-input-group">
+                <div className="bt-form-group">
+                  <label className="bt-label">Identification Name</label>
                   <input value={form.name} onChange={e => setForm({ ...form, name: e.target.value })}
-                    className="w-full rounded-lg border border-border bg-secondary px-3 py-2 text-sm text-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary" />
+                    className="bt-input" placeholder="e.g. iPhone 15 Pro Max" />
                 </div>
-                <div>
-                  <label className="mb-1 block text-xs font-medium text-muted-foreground">SKU *</label>
+                <div className="bt-form-group">
+                  <label className="bt-label">Internal SKU / Barcode</label>
                   <input value={form.sku} onChange={e => setForm({ ...form, sku: e.target.value })}
-                    className="w-full rounded-lg border border-border bg-secondary px-3 py-2 text-sm text-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary" />
+                    className="bt-input" placeholder="APL-IP15PM-256" />
                 </div>
               </div>
-              <div>
-                <label className="mb-1 block text-xs font-medium text-muted-foreground">Category</label>
+
+              <div className="bt-form-group">
+                <label className="bt-label">Classification Category</label>
                 <input value={form.category} onChange={e => setForm({ ...form, category: e.target.value })}
-                  className="w-full rounded-lg border border-border bg-secondary px-3 py-2 text-sm text-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary" />
+                  className="bt-input" placeholder="Mobile Devices, Accessories, etc." />
               </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="mb-1 block text-xs font-medium text-muted-foreground">Buying Price (KES)</label>
+
+              <div className="bt-input-group">
+                <div className="bt-form-group">
+                  <label className="bt-label">Procurement Cost (KES)</label>
                   <input type="number" value={form.buying_price} onChange={e => setForm({ ...form, buying_price: e.target.value })}
-                    className="w-full rounded-lg border border-border bg-secondary px-3 py-2 text-sm text-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary" />
+                    className="bt-input text-success" placeholder="0.00" />
                 </div>
-                <div>
-                  <label className="mb-1 block text-xs font-medium text-muted-foreground">Selling Price (KES) *</label>
+                <div className="bt-form-group">
+                  <label className="bt-label">Market Retail Price (KES)</label>
                   <input type="number" value={form.selling_price} onChange={e => setForm({ ...form, selling_price: e.target.value })}
-                    className="w-full rounded-lg border border-border bg-secondary px-3 py-2 text-sm text-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary" />
+                    className="bt-input text-primary" placeholder="0.00" />
                 </div>
               </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="mb-1 block text-xs font-medium text-muted-foreground">Stock Quantity</label>
+
+              <div className="bt-input-group">
+                <div className="bt-form-group">
+                  <label className="bt-label">Initial Stock Count</label>
                   <input type="number" value={form.stock} onChange={e => setForm({ ...form, stock: e.target.value })}
-                    className="w-full rounded-lg border border-border bg-secondary px-3 py-2 text-sm text-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary" />
+                    className="bt-input" placeholder="Available units" />
                 </div>
-                <div>
-                  <label className="mb-1 block text-xs font-medium text-muted-foreground">Low Stock Threshold</label>
+                <div className="bt-form-group">
+                  <label className="bt-label">Alert Threshold</label>
                   <input type="number" value={form.low_stock_threshold} onChange={e => setForm({ ...form, low_stock_threshold: e.target.value })}
-                    className="w-full rounded-lg border border-border bg-secondary px-3 py-2 text-sm text-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary" />
+                    className="bt-input" placeholder="10" />
                 </div>
               </div>
-              <label className="flex items-center gap-2 cursor-pointer">
+
+              <label className="bt-checkbox-label">
                 <input type="checkbox" checked={form.imei_tracked} onChange={e => setForm({ ...form, imei_tracked: e.target.checked })}
-                  className="h-4 w-4 rounded border-border bg-secondary text-primary" />
-                <span className="text-sm text-muted-foreground">Track IMEI for this product</span>
+                  style={{ width: '18px', height: '18px', accentColor: 'var(--primary)' }} />
+                <div style={{ display: 'flex', flexDirection: 'column' }}>
+                  <span style={{ fontSize: '13px', fontWeight: 600, color: 'white' }}>Enable IMEI Tracking</span>
+                  <span style={{ fontSize: '11px', color: 'var(--text-dim)' }}>Required for unique serial number validation on devices</span>
+                </div>
               </label>
-              <div className="flex gap-3 pt-2">
-                <button onClick={() => setShowModal(false)} className="flex-1 rounded-lg bg-secondary px-4 py-2.5 text-sm font-medium text-secondary-foreground hover:bg-secondary/80">Cancel</button>
-                <button onClick={handleSave} disabled={saving}
-                  className="flex flex-1 items-center justify-center gap-2 rounded-lg gradient-orange px-4 py-2.5 text-sm font-semibold text-primary-foreground hover:opacity-90 disabled:opacity-50">
-                  {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-                  {editingId ? 'Update' : 'Add'} Product
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '15px', marginTop: '32px' }}>
+                <button onClick={() => setShowModal(false)} className="bt-icon-btn" style={{ width: '100%', height: '48px', fontWeight: 600 }}>Discard</button>
+                <button onClick={handleSave} disabled={saving} className="bt-submit-btn shadow-glow" style={{ height: '48px' }}>
+                  {saving ? <Loader2 size={18} className="animate-spin" /> : <Plus size={18} />}
+                  <span>{editingId ? 'Commit Changes' : 'Initialize Inventory Item'}</span>
                 </button>
               </div>
             </div>
           </div>
         </div>
       )}
+      {/* Confirmation Modal */}
+      <ActionModal 
+        isOpen={!!deleteId}
+        onClose={() => setDeleteId(null)}
+        onConfirm={confirmDelete}
+        title="Inventory Purge Warning"
+        description="Are you sure you want to permanently remove this product from the catalog? This will also purge its sales history reference."
+        confirmText="Confirm Purge"
+        type="danger"
+        loading={isDeleting}
+      />
     </div>
   );
 };

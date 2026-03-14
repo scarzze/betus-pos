@@ -1,4 +1,4 @@
-from sqlalchemy import Column, String, Float, Integer, Boolean, ForeignKey
+from sqlalchemy import Column, String, Float, Integer, Boolean, ForeignKey, JSON
 from sqlalchemy.dialects.postgresql import UUID
 import uuid
 from app.core.database import Base
@@ -12,9 +12,15 @@ class Product(Base):
 
     name = Column(String)
     sku = Column(String, unique=True)
+    description = Column(String, nullable=True)
+    image_url = Column(String, nullable=True)
     category = Column(String, nullable=True)
     buying_price = Column(Float, default=0.0)
     selling_price = Column(Float, default=0.0)
     stock_quantity = Column(Integer, default=0)
     low_stock_threshold = Column(Integer, default=5)
     imei_tracking = Column(Boolean, default=False)
+    
+    # Ecommerce Flags
+    is_online = Column(Boolean, default=False)
+    specifications = Column(JSON, nullable=True) # { "Display": "6.1 inch", "Storage": "128GB" }

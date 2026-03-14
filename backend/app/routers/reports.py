@@ -64,7 +64,7 @@ def profit_loss_report(
     query = db.query(SaleItem, Sale).join(Sale, Sale.id == SaleItem.sale_id).filter(
         Sale.created_at >= start_date,
         Sale.created_at <= end_date,
-        Sale.payment_status == "PAID"
+        Sale.payment_status.in_(["PAID", "COMPLETED"])
     )
 
     report = []

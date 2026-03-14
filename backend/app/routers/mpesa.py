@@ -28,24 +28,44 @@ def initiate_stk(
     if sale.payment_status == "PAID":
         raise HTTPException(status_code=400, detail="Already paid")
 
-    response = stk_push(
-        phone=phone,
-        amount=int(sale.total_amount),
-        reference=str(sale.id)
-    )
+    try:
+        # Use sale_number as reference (short and recognizable on phone)
+        response = stk_push(
+            phone=phone,
+            amount=int(sale.total_amount),
+            reference=sale.sale_number or str(sale.id)[:12]
+        )
+        
+        if response.get("ResponseCode") != "0":
+            error_msg = response.get("errorMessage") or response.get("CustomerMessage") or "Safaricom Handshake Refused"
+            raise HTTPException(status_code=400, detail=f"M-Pesa Error: {error_msg}")
 
-    if "ResponseCode" not in response:
-        raise HTTPException(status_code=400, detail="Failed to initiate STK")
+        # Store the CheckoutRequestID to link with the callback later
+        sale.mpesa_checkout_id = response.get("CheckoutRequestID")
+        db.commit()
 
-    return {
-        "message": "STK push sent",
-        "mpesa_response": response
-    }
+        return {
+            "message": "STK push sent",
+            "mpesa_response": response
+        }
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        if isinstance(e, HTTPException): raise e
+        # Check if it's an AttributeError (likely migration issue)
+        detail = str(e)
+        if "mpesa_checkout_id" in detail:
+            detail = "Critical System Error: M-Pesa telemetry field not found in database. Please ensure migrations are applied and server is restarted."
+        raise HTTPException(status_code=500, detail=f"Internal Gateway Error: {detail}")
 
 
 # ==============================
 # 2️⃣ Daraja Callback Endpoint
 # ==============================
+
+from app.models.online_order import OnlineOrder
+
+# ... existing code ...
 
 @router.post("/callback")
 async def mpesa_callback(request: Request, db: Session = Depends(get_db)):
@@ -55,42 +75,50 @@ async def mpesa_callback(request: Request, db: Session = Depends(get_db)):
         callback = data["Body"]["stkCallback"]
         result_code = callback["ResultCode"]
         checkout_request_id = callback["CheckoutRequestID"]
-
     except KeyError:
         raise HTTPException(status_code=400, detail="Invalid callback format")
 
-    # Extract reference
     metadata = callback.get("CallbackMetadata", {}).get("Item", [])
-
     transaction_code = None
     amount = None
-    phone = None
-    reference = None
-
+    
     for item in metadata:
         if item["Name"] == "MpesaReceiptNumber":
             transaction_code = item["Value"]
         elif item["Name"] == "Amount":
             amount = item["Value"]
-        elif item["Name"] == "PhoneNumber":
-            phone = item["Value"]
 
-    # The AccountReference was sale_id
-    reference = callback.get("AccountReference")
+    # The most reliable way to find the record is by CheckoutRequestID
+    # Check Online Orders first
+    target = db.query(OnlineOrder).filter(OnlineOrder.mpesa_checkout_id == checkout_request_id).first()
+    is_web = True
+    
+    if not target:
+        # Check POS Sales
+        target = db.query(Sale).filter(Sale.mpesa_checkout_id == checkout_request_id).first()
+        is_web = False
 
-    if not reference:
-        return {"ResultCode": 0, "ResultDesc": "Accepted"}
+    if not target:
+        # Fallback to AccountReference if CheckoutRequestID lookup fails
+        reference_raw = callback.get("AccountReference", "")
+        if reference_raw.startswith("WEB_"):
+             order_id = reference_raw.replace("WEB_", "")
+             target = db.query(OnlineOrder).filter(OnlineOrder.id == order_id).first()
+             is_web = True
+        else:
+             target = db.query(Sale).filter((Sale.id == reference_raw) | (Sale.sale_number == reference_raw)).first()
+             is_web = False
 
-    sale = db.query(Sale).filter(Sale.id == reference).first()
-
-    if not sale:
-        return {"ResultCode": 0, "ResultDesc": "Accepted"}
+    if not target:
+        return {"ResultCode": 0, "ResultDesc": "Accepted (Target Not Found)"}
 
     if result_code == 0:
-        sale.payment_status = "PAID"
+        target.status = "PAID" if is_web else "COMPLETED"
+        if not is_web:
+            target.payment_status = "PAID"
 
         payment = Payment(
-            sale_id=sale.id,
+            sale_id=target.id if not is_web else None,
             amount=amount,
             method="MPESA",
             status="SUCCESS",
@@ -99,27 +127,20 @@ async def mpesa_callback(request: Request, db: Session = Depends(get_db)):
         db.add(payment)
         db.commit()
 
-        # 🔥 Real-time broadcast to frontend
+        # Real-time broadcast
+        msg_type = "web_order_paid" if is_web else "payment_success"
         await manager.broadcast(
-            str(sale.organization_id),
+            str(target.organization_id) if not is_web else "GLOBAL", # Web orders broadcast to all admins
             {
-                "type": "payment_success",
-                "sale_id": str(sale.id),
-                "amount": amount,
+                "type": msg_type,
+                "id": str(target.id),
                 "transaction_code": transaction_code
             }
         )
-
     else:
-        sale.payment_status = "FAILED"
+        target.status = "FAILED"
+        if not is_web:
+            target.payment_status = "FAILED"
         db.commit()
-
-        await manager.broadcast(
-            str(sale.organization_id),
-            {
-                "type": "payment_failed",
-                "sale_id": str(sale.id)
-            }
-        )
 
     return {"ResultCode": 0, "ResultDesc": "Accepted"}

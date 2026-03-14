@@ -22,7 +22,8 @@ class SaleItemIn(BaseModel):
 class SaleCreate(BaseModel):
     sale_number: Optional[str] = None
     user_id: Optional[UUID] = None
-    payment_method: str          # "cash" | "mpesa"
+    customer_id: Optional[UUID] = None
+    payment_method: str          # "cash" | "mpesa" | "credit"
     total_amount: float
     total_cost: float = 0.0
     profit: float = 0.0
@@ -50,6 +51,7 @@ class SaleOut(BaseModel):
 
     id: UUID
     sale_number: Optional[str] = None
+    customer_id: Optional[UUID] = None
     total_amount: float
     total_cost: float = 0.0
     profit: float = 0.0

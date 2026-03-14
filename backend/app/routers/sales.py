@@ -7,6 +7,7 @@ from app.schemas.sale import SaleCreate, SaleOut
 from app.models.sale import Sale
 from app.models.sale_items import SaleItem
 from app.models.product import Product
+from app.models.customer import Customer
 from app.core.rbac import require_roles
 
 router = APIRouter()
@@ -23,17 +24,40 @@ def new_sale(
     user_id = user.get("sub")
 
     try:
+        # Check customer if provided
+        customer = None
+        if sale_data.customer_id:
+            customer = db.query(Customer).filter(Customer.id == sale_data.customer_id).first()
+            if not customer:
+                raise HTTPException(status_code=400, detail="Customer not found")
+
+        # Determine payment status
+        status = sale_data.status.upper() if sale_data.status else "COMPLETED"
+        payment_method = sale_data.payment_method.upper()
+        
+        if payment_method == "CREDIT":
+            status = "UNPAID"
+        elif payment_method == "MPESA":
+            status = "PENDING" # Requires Callback to finalize
+
         sale = Sale(
             sale_number=sale_data.sale_number,
             user_id=user_id,
             organization_id=org_id,
-            payment_method=sale_data.payment_method,
-            payment_status=sale_data.status.upper() if sale_data.status else "COMPLETED",
+            customer_id=sale_data.customer_id,
+            payment_method=payment_method,
+            payment_status=status,
             total_amount=sale_data.total_amount,
             total_cost=sale_data.total_cost,
             profit=sale_data.profit,
         )
         db.add(sale)
+        
+        # If credit sale, update customer debt
+        if sale_data.payment_method.lower() == "credit" and customer:
+            customer.total_debt += sale_data.total_amount
+            db.add(customer)
+
         db.flush()  # get sale.id before creating items
 
         for item in sale_data.items:

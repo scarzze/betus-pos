@@ -1,18 +1,21 @@
 import { useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
-import vinlexLogo from '@/assets/vinlex-logo.png';
-import {
-  LayoutDashboard,
-  Package,
-  ShoppingCart,
-  BarChart3,
-  Settings,
-  LogOut,
-  ChevronLeft,
-  ChevronRight,
-  Users,
+import { 
+  LayoutDashboard, 
+  Package, 
+  ShoppingCart, 
+  BarChart3, 
+  Settings, 
+  LogOut, 
+  ChevronLeft, 
+  ChevronRight, 
+  Users, 
+  Receipt,
+  ShieldAlert,
+  ShoppingBag
 } from 'lucide-react';
+import BrandLogo from './BrandLogo';
 
 const AppLayout = ({ children }: { children: React.ReactNode }) => {
   const [collapsed, setCollapsed] = useState(false);
@@ -21,93 +24,118 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
   const navigate = useNavigate();
 
   const handleLogout = () => {
-    logout(); // supabase removed
+    logout();
     navigate('/login');
   };
 
   const navItems = [
     { icon: LayoutDashboard, label: 'Dashboard', path: '/dashboard', roles: ['SUPER_ADMIN', 'ADMIN', 'SALES'] },
     { icon: Package, label: 'Products', path: '/products', roles: ['SUPER_ADMIN', 'ADMIN'] },
-    { icon: ShoppingCart, label: 'Sales', path: '/sales', roles: ['SUPER_ADMIN', 'ADMIN', 'SALES'] },
+    {icon: ShoppingCart, label: 'Sales', path: '/sales', roles: ['SUPER_ADMIN', 'ADMIN', 'SALES'] },
+    { icon: Users, label: 'Customers', path: '/customers', roles: ['SUPER_ADMIN', 'ADMIN', 'SALES'] },
+    { icon: Receipt, label: 'Expenses', path: '/expenses', roles: ['SUPER_ADMIN', 'ADMIN'] },
+    { icon: ShoppingBag, label: 'Web Orders', path: '/web-orders', roles: ['SUPER_ADMIN', 'ADMIN'] },
     { icon: BarChart3, label: 'Reports', path: '/reports', roles: ['SUPER_ADMIN', 'ADMIN'] },
     { icon: Users, label: 'Users', path: '/users', roles: ['SUPER_ADMIN', 'ADMIN'] },
     { icon: Settings, label: 'Settings', path: '/settings', roles: ['SUPER_ADMIN', 'ADMIN'] },
+    { icon: ShieldAlert, label: 'Audit Vault', path: '/audit', roles: ['SUPER_ADMIN'] },
   ];
 
   const filteredNav = navItems.filter(item => user && item.roles.includes(user.role));
 
   const roleColors: Record<string, string> = {
-    SUPER_ADMIN: 'bg-primary/20 text-primary',
-    ADMIN: 'bg-info/20 text-info',
-    SALES: 'bg-success/20 text-success',
+    SUPER_ADMIN: 'rgba(99, 102, 241, 0.15)',
+    ADMIN: 'rgba(59, 130, 246, 0.15)',
+    SALES: 'rgba(34, 197, 94, 0.15)',
   };
 
   return (
-    <div className="flex h-screen overflow-hidden">
-      <aside className={`${collapsed ? 'w-[72px]' : 'w-64'} flex flex-col border-r border-border bg-sidebar transition-all duration-300`}>
-        {/* Logo */}
-        <div className="flex h-16 items-center gap-3 border-b border-border px-4">
-          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg overflow-hidden">
-            <img src={vinlexLogo} alt="VinLex" className="h-full w-full object-contain" />
-          </div>
-          {!collapsed && (
-            <div className="overflow-hidden">
-              <h1 className="font-display text-lg font-bold leading-tight text-foreground">VinLex</h1>
-              <p className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">Electronics POS</p>
-            </div>
-          )}
+    <div className="bt-layout animate-fade-in">
+      {/* Persistent Animated Background */}
+      <div className="flow-background">
+        <div className="blob blob-1"></div>
+        <div className="blob blob-2"></div>
+      </div>
+
+      <aside className="bt-sidebar" style={{ width: collapsed ? '80px' : '260px' }}>
+        {/* Logo Section */}
+        <div className="flex items-center gap-3 border-b border-border p-4" style={{ height: '84px', borderBottom: '1px solid var(--border-light)' }}>
+          <BrandLogo size={42} showText={!collapsed} />
         </div>
 
-        {/* Navigation */}
-        <nav className="flex-1 space-y-1 px-3 py-4">
+        {/* Navigation Section */}
+        <nav className="nav-container no-scrollbar">
           {filteredNav.map(item => {
             const isActive = location.pathname === item.path;
             return (
               <Link
                 key={item.path}
                 to={item.path}
-                className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all ${
-                  isActive ? 'bg-primary/10 text-primary glow-orange' : 'text-muted-foreground hover:bg-secondary hover:text-foreground'
-                }`}
+                className={`bt-nav-item ${isActive ? 'active shadow-glow' : ''}`}
+                style={{ color: isActive ? 'var(--primary)' : 'var(--text-muted)' }}
               >
-                <item.icon className={`h-5 w-5 shrink-0 ${isActive ? 'text-primary' : ''}`} />
-                {!collapsed && <span>{item.label}</span>}
+                <item.icon className="bt-nav-icon" />
+                {!collapsed && <span className="bt-nav-label animate-fade-in">{item.label}</span>}
               </Link>
             );
           })}
         </nav>
 
-        {/* User Section */}
-        <div className="border-t border-border p-3">
+        {/* User & Toggle Section */}
+        <div className="border-t border-border p-4" style={{ borderColor: 'var(--border-light)', padding: '20px 16px' }}>
           {!collapsed && user && (
-            <div className="mb-3 rounded-lg bg-secondary p-3">
-              <p className="text-sm font-semibold text-foreground">{user.email}</p>
-              <span className={`mt-1.5 inline-block rounded-md px-2 py-0.5 text-[10px] font-bold uppercase ${roleColors[user.role] || ''}`}>
+            <div className="mb-5 rounded-xl bg-white/5 p-3 animate-fade-in" style={{ border: '1px solid rgba(255,255,255,0.03)' }}>
+              <p className="truncate text-xs font-semibold text-white">{user.email}</p>
+              <span 
+                className="mt-2 inline-block rounded-md px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider"
+                style={{ backgroundColor: roleColors[user.role], color: 'var(--primary)' }}
+              >
                 {user.role.replace('_', ' ')}
               </span>
             </div>
           )}
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => setCollapsed(!collapsed)}
-              className="flex h-9 w-9 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
-            >
-              {collapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
-            </button>
-            {!collapsed && (
+          
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <button
+                onClick={() => setCollapsed(!collapsed)}
+                className="bt-icon-btn"
+                style={{ flexShrink: 0 }}
+                title={collapsed ? "Expand Sidebar" : "Collapse Sidebar"}
+              >
+                {collapsed ? <ChevronRight size={18} /> : <ChevronLeft size={18} />}
+              </button>
+              
+              {!collapsed && (
+                <button
+                  onClick={handleLogout}
+                  className="bt-logout-btn shadow-glow"
+                >
+                  <LogOut className="logout-icon" />
+                  <span>Logout</span>
+                </button>
+              )}
+            </div>
+
+            {collapsed && (
               <button
                 onClick={handleLogout}
-                className="flex flex-1 items-center justify-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
+                className="bt-icon-btn animate-fade-in"
+                style={{ color: '#f87171', background: 'rgba(239, 68, 68, 0.12)', borderColor: 'rgba(239, 68, 68, 0.2)' }}
+                title="Logout"
               >
-                <LogOut className="h-4 w-4" />
-                Logout
+                <LogOut size={18} />
               </button>
             )}
           </div>
         </div>
       </aside>
 
-      <main className="flex-1 overflow-auto">{children}</main>
+      <main className="bt-main-content">
+        <div className="animate-slide-up h-full">
+          {children}
+        </div>
+      </main>
     </div>
   );
 };

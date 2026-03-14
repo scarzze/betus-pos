@@ -1,4 +1,4 @@
-from sqlalchemy import Column, String, Boolean, ForeignKey
+from sqlalchemy import Column, String, Boolean, ForeignKey, Integer, DateTime
 from sqlalchemy.dialects.postgresql import UUID
 import uuid
 from app.core.database import Base
@@ -13,3 +13,5 @@ class User(Base):
     hashed_password = Column(String)
     role = Column(String)  # SUPER_ADMIN ADMIN SALES
     is_active = Column(Boolean, default=True)
+    failed_attempts = Column(Integer, default=0)
+    locked_until = Column(DateTime, nullable=True)

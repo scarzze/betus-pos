@@ -1,8 +1,14 @@
-import { useState, useEffect } from 'react';
-import { Search, ShoppingCart, X, CreditCard, Banknote, Loader2, CheckCircle, Phone } from 'lucide-react';
+import { useState, useEffect, useRef } from 'react';
+import { Search, ShoppingCart, X, CreditCard, Banknote, Loader2, CheckCircle, Phone, Package, User as UserIcon, ShieldCheck, Timer, AlertCircle, CheckCircle2 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import api from '@/lib/api';
+
+interface Customer {
+  id: string;
+  name: string;
+  total_debt: number;
+}
 
 interface Product {
   id: string;
@@ -17,35 +23,78 @@ interface CartItem extends Product {
   qty: number;
 }
 
+type MpesaStage = 'idle' | 'sending' | 'processing' | 'verifying' | 'success' | 'error';
+
 const Sales = () => {
   const [cart, setCart] = useState<CartItem[]>([]);
   const [search, setSearch] = useState('');
-  const [paymentMethod, setPaymentMethod] = useState<'cash' | 'mpesa'>('cash');
+  const [paymentMethod, setPaymentMethod] = useState<'cash' | 'mpesa' | 'credit'>('cash');
   const [products, setProducts] = useState<Product[]>([]);
+  const [customers, setCustomers] = useState<Customer[]>([]);
+  const [selectedCustomerId, setSelectedCustomerId] = useState<string>('');
   const [loading, setLoading] = useState(true);
   const [completing, setCompleting] = useState(false);
   const [saleComplete, setSaleComplete] = useState(false);
   const [mpesaPhone, setMpesaPhone] = useState('');
   const [showMpesaModal, setShowMpesaModal] = useState(false);
+  const [mpesaStage, setMpesaStage] = useState<MpesaStage>('idle');
+  const [mpesaStatusMsg, setMpesaStatusMsg] = useState('');
+  
   const { user } = useAuth();
   const { toast } = useToast();
   const isSales = user?.role === 'SALES';
+  const socketRef = useRef<WebSocket | null>(null);
 
-  // Fetch products from backend (with auth)
+  // Fetch initial data
   useEffect(() => {
-    const fetchProducts = async () => {
+    const fetchData = async () => {
       try {
-        const res = await api.get<Product[]>('/products');
-        setProducts(res.data.filter(p => p.stock > 0));
+        const [prodRes, custRes] = await Promise.all([
+          api.get<Product[]>('/products'),
+          api.get<Customer[]>('/customers')
+        ]);
+        setProducts(prodRes.data.filter(p => p.stock > 0));
+        setCustomers(custRes.data);
       } catch (err) {
-        console.error(err);
-        toast({ title: 'Error', description: 'Failed to load products', variant: 'destructive' });
+        toast({ title: 'Error', description: 'Failed to load terminal data', variant: 'destructive' });
       } finally {
         setLoading(false);
       }
     };
-    fetchProducts();
+    fetchData();
   }, [saleComplete]);
+
+  // WebSocket for real-time payment confirmation
+  useEffect(() => {
+    if (user?.org) {
+      const wsUrl = `${import.meta.env.VITE_WS_URL || 'ws://localhost:8000/ws'}/${user.org}`;
+      const socket = new WebSocket(wsUrl);
+      
+      socket.onmessage = (event) => {
+        const data = JSON.parse(event.data);
+        if (data.type === 'payment_success') {
+          setMpesaStage('success');
+          setMpesaStatusMsg('Payment Verified. Transaction Ledger Finalized.');
+          toast({ title: '✅ M-Pesa Confirmed', description: 'Payment received successfully.' });
+          
+          // Clear cart and close modal after a short delay
+          setTimeout(() => {
+            setCart([]);
+            setSaleComplete(true);
+            setShowMpesaModal(false);
+            setMpesaStage('idle');
+            setTimeout(() => setSaleComplete(false), 2000);
+          }, 3000);
+        } else if (data.type === 'payment_failed') {
+          setMpesaStage('error');
+          setMpesaStatusMsg('Payment Failed or Cancelled by User.');
+        }
+      };
+
+      socketRef.current = socket;
+      return () => socket.close();
+    }
+  }, [user]);
 
   const addToCart = (product: Product) => {
     setCart(prev => {
@@ -77,22 +126,33 @@ const Sales = () => {
   const profit = totalAmount - totalCost;
   const filteredProducts = products.filter(p => p.name.toLowerCase().includes(search.toLowerCase()));
 
-  const completeSale = async (method: 'cash' | 'mpesa' = paymentMethod) => {
+  const completeSale = async (method: 'cash' | 'mpesa' | 'credit' = paymentMethod) => {
     if (cart.length === 0) return;
-    setCompleting(true);
+    if (method === 'credit' && !selectedCustomerId) {
+       toast({ title: 'Customer Required', description: 'Please select a customer for credit sales', variant: 'destructive' });
+       return;
+    }
+    
+    if (method === 'mpesa') {
+      setMpesaStage('sending');
+      setMpesaStatusMsg('Initializing Secure M-Pesa Handshake...');
+    } else {
+      setCompleting(true);
+    }
 
     try {
       const saleNumber = `S${Date.now().toString(36).toUpperCase()}`;
 
-      // POST sale — backend handles stock deduction within the same transaction
+      // POST sale
       const { data: sale } = await api.post('/sales', {
         sale_number: saleNumber,
         user_id: user?.id,
+        customer_id: selectedCustomerId || null,
         payment_method: method,
         total_amount: totalAmount,
         total_cost: totalCost,
         profit,
-        status: method === 'mpesa' ? 'pending' : 'completed',
+        status: method === 'mpesa' ? 'PENDING' : (method === 'credit' ? 'UNPAID' : 'COMPLETED'),
         items: cart.map(item => ({
           product_id: item.id,
           product_name: item.name,
@@ -106,154 +166,334 @@ const Sales = () => {
       // Handle M-Pesa STK push
       if (method === 'mpesa' && mpesaPhone) {
         try {
-          await api.post('/mpesa/stk', { phone: mpesaPhone, amount: totalAmount, sale_id: sale.id });
-          toast({ title: '📱 M-Pesa Prompt Sent', description: `Check phone ${mpesaPhone} for payment prompt` });
-        } catch {
+          await api.post(`/mpesa/stk/${sale.id}?phone=${mpesaPhone}`);
+          setMpesaStage('verifying'); // <--- Shift to Confirm stage
+          setMpesaStatusMsg('Checking Verification Ledger. Please confirm PIN on device...');
+          // Now we wait for WebSocket confirmation
+        } catch (err: any) {
+          setMpesaStage('error');
+          setMpesaStatusMsg(err.response?.data?.detail || 'Handshake failed. Interface error.');
           toast({ title: 'M-Pesa Error', description: 'Sale saved but payment prompt failed', variant: 'destructive' });
         }
+      } else {
+        // Non-Mpesa flows
+        setCart([]);
+        setSaleComplete(true);
+        setSelectedCustomerId('');
+        if (method === 'cash') toast({ title: '✅ Sale Complete', description: `${saleNumber} — KES ${totalAmount.toLocaleString()}` });
+        if (method === 'credit') toast({ title: '📝 Credit Recorded', description: `${saleNumber} — Assigned to Client` });
+        setTimeout(() => setSaleComplete(false), 2000);
       }
-
-      setCart([]);
-      setSaleComplete(true);
-      setShowMpesaModal(false);
-      setMpesaPhone('');
-      if (method === 'cash') toast({ title: '✅ Sale Complete', description: `${saleNumber} — KES ${totalAmount.toLocaleString()}` });
-      setTimeout(() => setSaleComplete(false), 2000);
     } catch (err: any) {
       const msg = err.response?.data?.detail || err.message || 'Unknown error';
       toast({ title: 'Sale Failed', description: msg, variant: 'destructive' });
+      if (method === 'mpesa') {
+        setMpesaStage('error');
+        setMpesaStatusMsg(msg);
+      }
     } finally {
-      setCompleting(false);
+      if (method !== 'mpesa') setCompleting(false);
     }
   };
 
   const handleComplete = () => {
     if (paymentMethod === 'mpesa') setShowMpesaModal(true);
+    else if (paymentMethod === 'credit') completeSale('credit');
     else completeSale('cash');
   };
 
-  if (loading) return <div className="flex h-full items-center justify-center"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>;
+  if (loading) return <div className="loader-container animate-fade-in"><Loader2 className="spinner large text-primary" /></div>;
 
   return (
-    <div className="flex h-full flex-col lg:flex-row">
+    <div className="sales-container animate-fade-in">
       {/* Product Grid */}
-      <div className="flex-1 p-6">
-        <div className="mb-6">
-          <h1 className="font-display text-2xl font-bold text-foreground">New Sale</h1>
-          <p className="text-sm text-muted-foreground">Select products to add to cart</p>
+      <section className="product-discovery bt-glass-panel" style={{ padding: '24px' }}>
+        <div className="page-header" style={{ marginBottom: '24px' }}>
+          <h1 className="page-title">Sales Terminal</h1>
+          <p className="page-subtitle">Select products to initialize a new transaction</p>
         </div>
-        <div className="relative mb-4">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <input type="text" value={search} onChange={e => setSearch(e.target.value)} placeholder="Search products…"
-            className="w-full rounded-lg border border-border bg-secondary pl-10 pr-4 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary" />
+        
+        <div className="search-bar-wrapper">
+          <Search className="search-icon" size={18} />
+          <input 
+            type="text" 
+            value={search} 
+            onChange={e => setSearch(e.target.value)} 
+            placeholder="Search catalog by name or SKU…"
+            className="bt-input search-input" 
+          />
         </div>
+        
         {filteredProducts.length === 0 ? (
-          <div className="flex h-48 items-center justify-center text-muted-foreground">
-            <p className="text-sm">{search ? 'No products match your search.' : 'No products in stock.'}</p>
+          <div className="bt-glass-panel flex flex-col items-center justify-center py-20 text-muted-foreground" style={{ textAlign: 'center' }}>
+            <ShoppingCart size={48} style={{ opacity: 0.2, marginBottom: '1rem' }} />
+            <h3 className="chart-title">{search ? 'No matches found' : 'Inventory is empty'}</h3>
+            <p className="text-sm">Try a different search term or check stock levels.</p>
           </div>
         ) : (
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-4">
+          <div className="products-grid">
             {filteredProducts.map(product => (
-              <button key={product.id} onClick={() => addToCart(product)}
-                className="glass-card p-4 text-left transition-all hover:border-primary/40 hover:glow-orange">
-                <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
-                  <ShoppingCart className="h-5 w-5 text-primary" />
+              <button 
+                key={product.id} 
+                onClick={() => addToCart(product)} 
+                className="bt-glass-card product-card animate-scale-in"
+                style={{ transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)' }}
+              >
+                <div className="product-icon-wrap theme-primary">
+                  <Package size={20} className="text-primary" />
                 </div>
-                <p className="text-sm font-medium text-foreground leading-tight">{product.name}</p>
-                <p className="mt-1 font-display text-lg font-bold text-primary">KES {product.selling_price.toLocaleString()}</p>
-                {!isSales && <p className="text-xs text-muted-foreground">Buy: KES {product.buying_price.toLocaleString()}</p>}
-                <p className="text-xs text-muted-foreground">{product.stock} in stock</p>
+                <div className="product-info">
+                  <h3 className="product-name">{product.name}</h3>
+                  <p className="product-price">KES {product.selling_price.toLocaleString()}</p>
+                  <div className="flex items-center justify-between" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span className={`status-badge ${product.stock < 5 ? 'theme-danger' : 'bg-primary-10 text-primary'}`} style={{ fontSize: '10px' }}>
+                      {product.stock} Units
+                    </span>
+                    {!isSales && <span style={{ fontSize: '10px', color: 'var(--text-dim)' }}>Margin: KES {(product.selling_price - product.buying_price).toLocaleString()}</span>}
+                  </div>
+                </div>
               </button>
             ))}
           </div>
         )}
-      </div>
+      </section>
 
       {/* Cart Panel */}
-      <div className="w-full border-l border-border bg-sidebar lg:w-96">
-        <div className="flex h-full flex-col">
-          <div className="border-b border-border p-4">
-            <h2 className="font-display text-lg font-semibold text-foreground">Cart ({cart.length})</h2>
-          </div>
-
-          <div className="flex-1 overflow-auto p-4 space-y-3">
-            {cart.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
-                {saleComplete ? (
-                  <><CheckCircle className="mb-3 h-10 w-10 text-success" /><p className="text-sm text-success font-semibold">Sale Completed!</p></>
-                ) : (
-                  <><ShoppingCart className="mb-3 h-10 w-10 opacity-30" /><p className="text-sm">Cart is empty</p></>
-                )}
-              </div>
-            ) : cart.map(item => (
-              <div key={item.id} className="flex items-center gap-3 rounded-lg bg-secondary p-3">
-                <div className="flex-1">
-                  <p className="text-sm font-medium text-foreground">{item.name}</p>
-                  <p className="text-xs text-muted-foreground">KES {item.selling_price.toLocaleString()} each</p>
-                  {!isSales && <p className="text-xs text-muted-foreground/60">Cost: KES {item.buying_price.toLocaleString()}</p>}
-                </div>
-                <div className="flex items-center gap-2">
-                  <button onClick={() => updateQty(item.id, item.qty - 1)} className="flex h-7 w-7 items-center justify-center rounded-md bg-muted text-sm font-bold text-foreground hover:bg-primary/20">−</button>
-                  <span className="w-6 text-center text-sm font-semibold text-foreground">{item.qty}</span>
-                  <button onClick={() => updateQty(item.id, item.qty + 1)} className="flex h-7 w-7 items-center justify-center rounded-md bg-muted text-sm font-bold text-foreground hover:bg-primary/20">+</button>
-                </div>
-                <button onClick={() => removeFromCart(item.id)} className="text-muted-foreground hover:text-destructive"><X className="h-4 w-4" /></button>
-              </div>
-            ))}
-          </div>
-
-          {/* Checkout */}
-          <div className="border-t border-border p-4 space-y-4">
-            <div className="space-y-1">
-              <div className="flex items-center justify-between">
-                <span className="text-sm font-medium text-muted-foreground">Subtotal</span>
-                <span className="text-sm font-semibold text-foreground">KES {totalAmount.toLocaleString()}</span>
-              </div>
-              {!isSales && <>
-                <div className="flex items-center justify-between"><span className="text-xs text-muted-foreground">Total Cost</span><span className="text-xs text-muted-foreground">KES {totalCost.toLocaleString()}</span></div>
-                <div className="flex items-center justify-between"><span className="text-xs text-muted-foreground">Profit</span><span className={`text-xs font-semibold ${profit >= 0 ? 'text-success' : 'text-destructive'}`}>KES {profit.toLocaleString()}</span></div>
-              </>}
-              <div className="flex items-center justify-between pt-1"><span className="text-sm font-medium text-muted-foreground">Total</span><span className="font-display text-2xl font-bold text-foreground">KES {totalAmount.toLocaleString()}</span></div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-2">
-              <button onClick={() => setPaymentMethod('cash')}
-                className={`flex items-center justify-center gap-2 rounded-lg px-3 py-2.5 text-sm font-medium transition-all ${paymentMethod === 'cash' ? 'bg-primary/15 text-primary border border-primary/30' : 'bg-secondary text-muted-foreground border border-transparent'}`}><Banknote className="h-4 w-4" />Cash</button>
-              <button onClick={() => setPaymentMethod('mpesa')}
-                className={`flex items-center justify-center gap-2 rounded-lg px-3 py-2.5 text-sm font-medium transition-all ${paymentMethod === 'mpesa' ? 'bg-success/15 text-success border border-success/30' : 'bg-secondary text-muted-foreground border border-transparent'}`}><CreditCard className="h-4 w-4" />M-Pesa</button>
-            </div>
-
-            <button disabled={cart.length === 0 || completing} onClick={handleComplete}
-              className="w-full rounded-lg gradient-orange px-4 py-3 text-sm font-semibold text-primary-foreground transition-opacity hover:opacity-90 disabled:opacity-30 flex items-center justify-center gap-2">
-              {completing ? <><Loader2 className="h-4 w-4 animate-spin" />Processing…</> : `Complete Sale — KES ${totalAmount.toLocaleString()}`}
-            </button>
+      <aside className="cart-sidebar bt-glass-panel">
+        <div className="cart-header">
+          <div className="cart-title">
+            <ShoppingCart size={20} className="text-primary" />
+            <span>Active Cart</span>
+            <span className="cart-badge">{cart.length}</span>
           </div>
         </div>
-      </div>
 
-      {/* M-Pesa Modal */}
+        <div className="cart-items-wrapper no-scrollbar">
+          {cart.length === 0 ? (
+            <div className="flex flex-col items-center justify-center h-full text-muted-foreground opacity-50" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%' }}>
+              {saleComplete ? (
+                <>
+                  <CheckCircle size={48} className="text-success mb-3" />
+                  <p className="font-bold text-success">Transaction Successful</p>
+                </>
+              ) : (
+                <>
+                  <ShoppingCart size={40} className="mb-3" />
+                  <p className="text-sm font-medium">Your cart is empty</p>
+                </>
+              )}
+            </div>
+          ) : (
+            <div className="cart-items-list">
+              {cart.map(item => (
+                <div key={item.id} className="cart-item animate-slide-up">
+                  <div className="item-details" style={{ flex: 1 }}>
+                    <p className="item-name">{item.name}</p>
+                    <p className="item-price">KES {item.selling_price.toLocaleString()}</p>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <div className="item-controls">
+                      <button onClick={() => updateQty(item.id, item.qty - 1)} className="qty-btn" style={{ fontSize: '18px' }}>−</button>
+                      <span className="qty-count">{item.qty}</span>
+                      <button onClick={() => updateQty(item.id, item.qty + 1)} className="qty-btn" style={{ fontSize: '18px' }}>+</button>
+                    </div>
+                    <button onClick={() => removeFromCart(item.id)} className="bt-icon-btn" style={{ width: '32px', height: '32px', borderRadius: '8px', color: '#f87171' }}>
+                      <X size={14} />
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Customer Selection */}
+        <div className="summary-section" style={{ marginBottom: '16px', borderBottom: '1px solid var(--border-light)', paddingBottom: '16px' }}>
+          <label className="bt-label" style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+            <UserIcon size={14} className="text-primary" />
+            <span>Customer / Client</span>
+          </label>
+          <select 
+            className="bt-input" 
+            style={{ width: '100%', fontSize: '13px', background: 'rgba(255,255,255,0.02)' }}
+            value={selectedCustomerId}
+            onChange={(e) => setSelectedCustomerId(e.target.value)}
+          >
+            <option value="">Walk-in Customer</option>
+            {customers.map(c => (
+              <option key={c.id} value={c.id}>{c.name} (Debt: KES {c.total_debt.toLocaleString()})</option>
+            ))}
+          </select>
+        </div>
+
+        {/* Checkout Summary */}
+        <div className="cart-footer">
+          <div className="summary-section" style={{ marginBottom: '20px' }}>
+            <div className="summary-row">
+              <span style={{ color: 'var(--text-dim)' }}>Subtotal</span>
+              <span style={{ fontWeight: 600 }}>KES {totalAmount.toLocaleString()}</span>
+            </div>
+            {!isSales && (
+              <div className="summary-row" style={{ marginTop: '4px', fontSize: '12px' }}>
+                <span style={{ color: 'var(--text-dim)' }}>Expected Profit</span>
+                <span className="text-success" style={{ fontWeight: 600 }}>+ KES {profit.toLocaleString()}</span>
+              </div>
+            )}
+            <div className="summary-row total-row">
+              <span>Total Pay</span>
+              <span className="text-white">KES {totalAmount.toLocaleString()}</span>
+            </div>
+          </div>
+
+          <div className="payment-methods">
+            <button 
+              onClick={() => setPaymentMethod('cash')}
+              className={`method-btn ${paymentMethod === 'cash' ? 'active-cash shadow-glow' : ''}`}
+            >
+              <Banknote size={16} /> <span>Cash</span>
+            </button>
+            <button 
+              onClick={() => setPaymentMethod('mpesa')}
+              className={`method-btn ${paymentMethod === 'mpesa' ? 'active-mpesa shadow-glow' : ''}`}
+            >
+              <CreditCard size={16} /> <span>M-Pesa</span>
+            </button>
+            <button 
+              onClick={() => setPaymentMethod('credit')}
+              className={`method-btn ${paymentMethod === 'credit' ? 'active-credit shadow-glow' : ''}`}
+              style={{ borderColor: paymentMethod === 'credit' ? '#f87171' : 'var(--border-light)' }}
+            >
+              <UserIcon size={16} /> <span>Credit</span>
+            </button>
+          </div>
+
+          <button 
+            disabled={cart.length === 0 || completing} 
+            onClick={handleComplete}
+            className="bt-submit-btn shadow-glow"
+            style={{ padding: '14px', borderRadius: '12px' }}
+          >
+            {completing ? (
+              <><Loader2 size={18} className="animate-spin" /> Finalizing…</>
+            ) : (
+              `Complete Transaction`
+            )}
+          </button>
+        </div>
+      </aside>
+
+      {/* Modern M-Pesa Handshake Modal */}
       {showMpesaModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm">
-          <div className="glass-card w-full max-w-sm mx-4 p-6 animate-scale-in">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="font-display text-lg font-semibold text-foreground">M-Pesa Payment</h2>
-              <button onClick={() => setShowMpesaModal(false)} className="text-muted-foreground hover:text-foreground"><X className="h-5 w-5" /></button>
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-xl animate-fade-in">
+          <div className="bt-glass-panel max-w-md w-full p-10 border-white/10 shadow-[0_0_50px_rgba(0,0,0,0.5)] animate-scale-in">
+            
+            {/* Stage Indicator Icons */}
+            <div className="flex justify-center mb-10 overflow-hidden">
+               <div className="flex items-center gap-2 relative">
+                  <div className={`w-3 h-3 rounded-full transition-all duration-500 ${mpesaStage !== 'idle' ? 'bg-primary' : 'bg-white/10'}`} />
+                  <div className={`w-12 h-0.5 transition-all duration-500 ${['processing', 'verifying', 'success'].includes(mpesaStage) ? 'bg-primary' : 'bg-white/10'}`} />
+                  <div className={`w-3 h-3 rounded-full transition-all duration-500 ${['processing', 'verifying', 'success'].includes(mpesaStage) ? 'bg-primary' : 'bg-white/10'}`} />
+                  <div className={`w-12 h-0.5 transition-all duration-500 ${mpesaStage === 'success' ? 'bg-primary' : 'bg-white/10'}`} />
+                  <div className={`w-3 h-3 rounded-full transition-all duration-500 ${mpesaStage === 'success' ? 'bg-primary' : 'bg-white/10'}`} />
+               </div>
             </div>
-            <p className="text-sm text-muted-foreground mb-4">Enter customer's phone number to send STK push</p>
-            <div className="relative mb-4">
-              <Phone className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-              <input type="tel" value={mpesaPhone} onChange={e => setMpesaPhone(e.target.value)} placeholder="0712345678"
-                className="w-full rounded-lg border border-border bg-secondary pl-10 pr-4 py-3 text-sm text-foreground placeholder:text-muted-foreground focus:border-success focus:outline-none focus:ring-1 focus:ring-success" />
-            </div>
-            <p className="text-center font-display text-xl font-bold text-foreground mb-4">KES {totalAmount.toLocaleString()}</p>
-            <div className="flex gap-3">
-              <button onClick={() => setShowMpesaModal(false)} className="flex-1 rounded-lg bg-secondary px-4 py-2.5 text-sm font-medium text-secondary-foreground">Cancel</button>
-              <button onClick={() => completeSale('mpesa')} disabled={!mpesaPhone || completing}
-                className="flex flex-1 items-center justify-center gap-2 rounded-lg bg-success px-4 py-2.5 text-sm font-semibold text-success-foreground hover:opacity-90 disabled:opacity-50">
-                {completing ? <Loader2 className="h-4 w-4 animate-spin" /> : <CreditCard className="h-4 w-4" />}
-                Send STK Push
-              </button>
-            </div>
+
+            {mpesaStage === 'idle' ? (
+              <form 
+                onSubmit={(e) => { e.preventDefault(); if(mpesaPhone) completeSale('mpesa'); }}
+                className="animate-fade-in"
+              >
+                <div className="flex items-center gap-4 mb-8">
+                  <div className="w-12 h-12 md:w-14 md:h-14 rounded-2xl bg-primary/10 flex items-center justify-center border border-primary/20">
+                    <Phone className="text-primary" size={24} />
+                  </div>
+                  <div>
+                    <h2 className="text-xl md:text-2xl font-black tracking-tight uppercase leading-none">M-Pesa Express</h2>
+                    <p className="text-[10px] font-bold text-white/30 uppercase tracking-widest mt-1">Initialization Phase</p>
+                  </div>
+                </div>
+                
+                <div className="space-y-4 md:space-y-6 mb-8 md:mb-10">
+                  <div className="relative group">
+                    <Phone size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-primary/60 group-focus-within:text-primary transition-colors" />
+                    <input 
+                      type="tel" 
+                      value={mpesaPhone} 
+                      onChange={e => setMpesaPhone(e.target.value)} 
+                      placeholder="e.g. 07XXXXXXXX"
+                      className="w-full pl-12 pr-4 py-4 bg-white/5 border border-white/10 rounded-2xl focus:border-primary/50 transition-all text-sm outline-none font-bold text-white placeholder:text-white/20"
+                      autoFocus
+                    />
+                  </div>
+                  
+                  <div className="bg-white/5 border border-white/5 rounded-2xl p-4 md:p-6 text-center">
+                    <p className="text-[9px] font-black text-white/20 uppercase tracking-[0.2em] mb-1">Amount to Charge</p>
+                    <p className="text-2xl md:text-3xl font-black text-white">KES {totalAmount.toLocaleString()}</p>
+                  </div>
+                </div>
+                
+                <div className="flex gap-4">
+                  <button type="button" onClick={() => setShowMpesaModal(false)} className="flex-1 py-4 bg-white/5 hover:bg-white/10 text-white/40 font-bold rounded-2xl border border-white/10 transition-all text-[10px] uppercase tracking-widest">Cancel</button>
+                  <button 
+                    type="submit"
+                    disabled={!mpesaPhone}
+                    className="flex-1 py-4 bg-primary text-black font-black rounded-2xl hover:scale-[1.02] active:scale-[0.98] transition-all text-[10px] uppercase tracking-[0.2em] shadow-[0_10px_20px_rgba(var(--primary-rgb),0.2)]"
+                  >
+                    Initiate
+                  </button>
+                </div>
+              </form>
+            ) : mpesaStage === 'success' ? (
+              <div className="text-center animate-scale-in">
+                 <div className="w-20 h-20 rounded-full bg-emerald-500/20 flex items-center justify-center mx-auto mb-8 border border-emerald-500/30">
+                    <CheckCircle2 size={40} className="text-emerald-500" />
+                 </div>
+                 <h2 className="text-2xl font-black mb-2 uppercase tracking-tight">Access Verified</h2>
+                 <p className="text-emerald-400/60 font-medium text-sm mb-10">{mpesaStatusMsg}</p>
+                 <div className="py-4 px-6 bg-white/5 rounded-2xl text-[10px] font-bold text-white/20 uppercase tracking-widest">
+                    Ledger Finalized • {new Date().toLocaleTimeString()}
+                 </div>
+              </div>
+            ) : (
+              <div className="text-center animate-fade-in">
+                <div className="relative w-24 h-24 mx-auto mb-10">
+                   {mpesaStage === 'error' ? (
+                     <div className="w-24 h-24 rounded-full bg-red-500/10 flex items-center justify-center border border-red-500/20">
+                        <AlertCircle size={40} className="text-red-500" />
+                     </div>
+                   ) : (
+                     <div className="w-24 h-24 rounded-full border-4 border-primary/10 border-t-primary animate-spin" />
+                   )}
+                   <div className="absolute inset-0 flex items-center justify-center">
+                      <ShieldCheck size={32} className={mpesaStage === 'error' ? 'text-red-500/20' : 'text-primary/20'} />
+                   </div>
+                </div>
+
+                <h3 className="text-xl font-black mb-4 uppercase tracking-tight">
+                  {mpesaStage === 'sending' ? 'Sending Request' : 
+                   mpesaStage === 'processing' ? 'Checkout Prompt' : 
+                   mpesaStage === 'verifying' ? 'Verifying Receipt' : 'Identity Error'}
+                </h3>
+                <p className={`text-sm font-medium leading-relaxed mb-10 ${mpesaStage === 'error' ? 'text-red-400' : 'text-white/40'}`}>
+                  {mpesaStatusMsg}
+                </p>
+
+                {mpesaStage === 'error' ? (
+                   <div className="flex gap-4">
+                      <button onClick={() => setMpesaStage('idle')} className="flex-1 py-4 bg-white/5 text-white/60 font-bold rounded-2xl border border-white/10 hover:bg-white/10 transition-all uppercase tracking-widest text-[10px]">Retry</button>
+                      <button onClick={() => setShowMpesaModal(false)} className="flex-1 py-4 bg-white/5 text-white/40 font-bold rounded-2xl border border-white/10 hover:bg-white/10 transition-all uppercase tracking-widest text-[10px]">Close</button>
+                   </div>
+                ) : (
+                  <div className="flex flex-col items-center gap-6">
+                     <div className="flex items-center justify-center gap-3 py-2 px-6 bg-primary/5 rounded-full border border-primary/10 animate-pulse">
+                        <Timer size={14} className="text-primary" />
+                        <span className="text-[10px] font-black text-primary uppercase tracking-[0.3em]">Temporal Handshake Active</span>
+                     </div>
+                     <p className="text-[9px] font-bold text-white/10 uppercase tracking-widest">Do not disconnect or refresh</p>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         </div>
       )}

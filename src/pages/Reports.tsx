@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { BarChart3, TrendingUp, Package, CreditCard, Download, Loader2, Calendar } from 'lucide-react';
+import { BarChart3, TrendingUp, TrendingDown, Package, CreditCard, Download, Loader2, Calendar } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import api from '@/lib/api';
 
@@ -89,84 +89,86 @@ const Reports = () => {
 
   const reportSections = [
     {
-      title: 'Sales Report',
+      title: 'Sales Intelligence',
       icon: BarChart3,
-      description: 'Total sales, transactions, and average order value for the selected period.',
+      theme: 'theme-primary',
+      description: 'Transaction volume & revenue flow',
       stats: [
         { label: 'Total Sales', value: salesReport ? salesReport.total_sales.toString() : '—' },
         { label: 'Total Revenue', value: salesReport ? `KES ${salesReport.total_amount.toLocaleString()}` : '—' },
-        { label: 'Avg Order Value', value: salesReport ? `KES ${salesReport.average_order_value.toLocaleString(undefined, { maximumFractionDigits: 0 })}` : '—' },
+        { label: 'Avg Ticket', value: salesReport ? `KES ${salesReport.average_order_value.toLocaleString(undefined, { maximumFractionDigits: 0 })}` : '—' },
       ],
     },
     {
-      title: 'Profit & Loss',
+      title: 'Profitability Analysis',
       icon: TrendingUp,
-      description: 'Gross revenue, COGS, net profit, loss, and profit margin.',
+      theme: 'theme-success',
+      description: 'Net margins and cost efficiency',
       stats: [
         { label: 'Gross Revenue', value: plReport ? `KES ${plReport.gross_revenue.toLocaleString()}` : '—' },
-        { label: 'COGS', value: plReport ? `KES ${plReport.total_cogs.toLocaleString()}` : '—' },
-        { label: 'Net Profit', value: plReport ? `KES ${plReport.net_profit.toLocaleString()}` : '—' },
+        { label: 'Total COGS', value: plReport ? `KES ${plReport.total_cogs.toLocaleString()}` : '—' },
+        { label: 'Net Profit', value: plReport ? `KES ${plReport.net_profit.toLocaleString()}` : '—', highlight: true },
         { label: 'Profit Margin', value: plReport ? `${plReport.profit_margin.toFixed(1)}%` : '—' },
       ],
     },
     {
-      title: 'Inventory',
+      title: 'Inventory Health',
       icon: Package,
-      description: 'Current stock levels and low stock alerts.',
+      theme: 'theme-info',
+      description: 'Stock availability & low alerts',
       stats: [
-        { label: 'Total Products', value: inventory.length.toString() },
-        { label: 'Low Stock Items', value: lowStockCount.toString() },
+        { label: 'Active SKUs', value: inventory.length.toString() },
+        { label: 'Critical Stock', value: lowStockCount.toString(), critical: lowStockCount > 0 },
       ],
     },
   ];
 
   return (
-    <div className="p-6">
-      <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="font-display text-2xl font-bold text-foreground">Reports</h1>
-          <p className="text-sm text-muted-foreground">Financial intelligence & analytics</p>
-        </div>
-        <div className="flex flex-wrap gap-2 items-center">
-          {/* Date range picker */}
-          <div className="flex items-center gap-1 rounded-lg border border-border bg-secondary px-3 py-1.5 text-xs text-muted-foreground">
-            <Calendar className="h-3 w-3" />
-            <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)}
-              className="bg-transparent text-foreground focus:outline-none" />
-            <span>→</span>
-            <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)}
-              className="bg-transparent text-foreground focus:outline-none" />
+    <div className="report-container animate-fade-in">
+      <div className="page-header" style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+        <h1 className="page-title">Reports & Analytics</h1>
+        <p className="page-subtitle">Track your business performance and financial health</p>
+        
+        <div className="report-controls">
+          <div className="bt-date-picker">
+            <Calendar size={16} className="text-primary" />
+            <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} />
+            <span style={{ color: 'var(--text-dim)', fontSize: '10px' }}>TO</span>
+            <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} />
           </div>
-          <button onClick={fetchReports} className="flex items-center gap-2 rounded-lg bg-primary/15 px-3 py-2 text-xs font-medium text-primary hover:bg-primary/25">
-            {loading ? <Loader2 className="h-3 w-3 animate-spin" /> : null}
-            Refresh
+          
+          <button onClick={fetchReports} className="bt-icon-btn" style={{ width: 'auto', padding: '0 16px', gap: '8px', fontSize: '12px', fontWeight: 600 }}>
+            {loading ? <Loader2 size={16} className="animate-spin" /> : <BarChart3 size={16} />}
+            Filter Results
           </button>
-          <button onClick={handleExportCSV} className="flex items-center gap-2 rounded-lg bg-secondary px-4 py-2 text-sm font-medium text-secondary-foreground transition-colors hover:bg-secondary/80">
-            <Download className="h-4 w-4" />
-            Export CSV
+          
+          <button onClick={handleExportCSV} className="bt-submit-btn" style={{ padding: '8px 16px', fontSize: '13px' }}>
+            <Download size={16} />
+            Export Data
           </button>
         </div>
       </div>
 
-      {/* Report Cards */}
-      <div className="mb-8 grid gap-4 grid-cols-1 md:grid-cols-3">
+      {/* Grid of Intel Cards */}
+      <div className="reports-grid">
         {reportSections.map((section) => (
-          <div key={section.title} className="glass-card p-5">
-            <div className="mb-4 flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 text-primary">
-                <section.icon className="h-5 w-5" />
+          <div key={section.title} className="bt-glass-panel" style={{ padding: '24px' }}>
+            <div className="section-card-header">
+              <div className={`stat-icon-wrapper ${section.theme}`}>
+                <section.icon className="stat-icon" />
               </div>
               <div>
-                <h3 className="font-display text-base font-semibold text-foreground">{section.title}</h3>
-                <p className="text-xs text-muted-foreground">{section.description}</p>
+                <h3 className="chart-title" style={{ marginBottom: '4px' }}>{section.title}</h3>
+                <p style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{section.description}</p>
               </div>
             </div>
-            <div className="grid grid-cols-2 gap-3">
+            
+            <div className="grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '12px' }}>
               {section.stats.map((stat) => (
-                <div key={stat.label} className="rounded-lg bg-secondary p-3">
-                  <p className="text-xs text-muted-foreground">{stat.label}</p>
-                  <p className="font-display text-lg font-bold text-foreground">
-                    {loading ? <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" /> : stat.value}
+                <div key={stat.label} className="bt-glass-card" style={{ padding: '12px', border: (stat as any).critical ? '1px solid rgba(239, 68, 68, 0.3)' : '' }}>
+                  <p className="stat-label" style={{ fontSize: '10px' }}>{stat.label}</p>
+                  <p className="stat-value" style={{ fontSize: '18px', color: (stat as any).highlight ? '#4ade80' : (stat as any).critical ? '#f87171' : 'white' }}>
+                    {loading ? '...' : stat.value}
                   </p>
                 </div>
               ))}
@@ -175,39 +177,54 @@ const Reports = () => {
         ))}
       </div>
 
-      {/* P&L Breakdown Table */}
+      {/* Financial Detail Table */}
       {plDetails.length > 0 && (
-        <div className="glass-card overflow-hidden">
-          <div className="border-b border-border p-4">
-            <h2 className="font-display text-lg font-semibold text-foreground">Profit & Loss Breakdown</h2>
+        <div className="bt-table-wrapper animate-slide-up">
+          <div className="flex items-center justify-between" style={{ padding: '20px', borderBottom: '1px solid var(--border-light)', display: 'flex' }}>
+            <h2 className="chart-title" style={{ margin: 0 }}>Financial Breakdown by Item</h2>
+            <span className="status-badge theme-info">Real-time Data</span>
           </div>
-          <div className="overflow-x-auto">
-            <table className="w-full">
+          <div className="no-scrollbar" style={{ overflowX: 'auto' }}>
+            <table className="bt-table">
               <thead>
-                <tr className="border-b border-border">
-                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground">Product ID</th>
-                  <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider text-muted-foreground">Qty Sold</th>
-                  <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider text-muted-foreground">Revenue</th>
-                  <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider text-muted-foreground">Cost</th>
-                  <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider text-muted-foreground">Profit</th>
-                  <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider text-muted-foreground">Loss</th>
+                <tr>
+                  <th>Product</th>
+                  <th style={{ textAlign: 'right' }}>Qty</th>
+                  <th style={{ textAlign: 'right' }}>Revenue</th>
+                  <th style={{ textAlign: 'right' }}>Cost</th>
+                  <th style={{ textAlign: 'right' }}>Profit</th>
+                  <th style={{ textAlign: 'right' }}>Margin</th>
                 </tr>
               </thead>
               <tbody>
-                {plDetails.map((row, i) => (
-                  <tr key={i} className="border-b border-border/50 transition-colors hover:bg-secondary/50">
-                    <td className="px-4 py-3 text-sm font-medium text-foreground font-mono">{row.product_id?.slice(0, 8)}…</td>
-                    <td className="px-4 py-3 text-right text-sm text-muted-foreground">{row.quantity}</td>
-                    <td className="px-4 py-3 text-right text-sm text-foreground">KES {row.revenue?.toLocaleString()}</td>
-                    <td className="px-4 py-3 text-right text-sm text-muted-foreground">KES {row.cost?.toLocaleString()}</td>
-                    <td className="px-4 py-3 text-right text-sm font-semibold text-success">
-                      {row.profit > 0 ? `KES ${row.profit.toLocaleString()}` : '—'}
-                    </td>
-                    <td className="px-4 py-3 text-right text-sm font-semibold text-destructive">
-                      {row.loss > 0 ? `KES ${row.loss.toLocaleString()}` : '—'}
-                    </td>
-                  </tr>
-                ))}
+                {plDetails.map((row, i) => {
+                  const margin = row.revenue > 0 ? ((row.profit / row.revenue) * 100).toFixed(1) : '0';
+                  return (
+                    <tr key={i}>
+                      <td style={{ fontWeight: 600 }}>
+                        <div style={{ display: 'flex', flexDirection: 'column' }}>
+                          <span>{row.product_name || `SKU: ${row.product_id?.slice(0, 8)}`}</span>
+                          <span style={{ fontSize: '10px', color: 'var(--text-dim)', fontFamily: 'monospace' }}>{row.product_id}</span>
+                        </div>
+                      </td>
+                      <td style={{ textAlign: 'right', fontWeight: 500 }}>{row.quantity}</td>
+                      <td style={{ textAlign: 'right' }}>KES {row.revenue?.toLocaleString()}</td>
+                      <td style={{ textAlign: 'right', color: 'var(--text-muted)' }}>KES {row.cost?.toLocaleString()}</td>
+                      <td style={{ textAlign: 'right' }}>
+                        <span className={row.profit >= 0 ? 'text-success' : 'text-danger'} style={{ fontWeight: 700 }}>
+                          KES {Math.abs(row.profit).toLocaleString()}
+                          {row.profit < 0 && ' (Loss)'}
+                        </span>
+                      </td>
+                      <td style={{ textAlign: 'right' }}>
+                        <div className={`trend-indicator ${Number(margin) >= 0 ? 'trend-up' : 'trend-down'}`}>
+                          {Number(margin) >= 0 ? <TrendingUp size={10} /> : <TrendingDown size={10} />}
+                          {margin}%
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
@@ -215,10 +232,10 @@ const Reports = () => {
       )}
 
       {!loading && plDetails.length === 0 && (
-        <div className="glass-card flex flex-col items-center justify-center py-16 text-muted-foreground">
-          <BarChart3 className="mb-3 h-10 w-10 opacity-30" />
-          <p className="text-sm">No sales data for the selected period.</p>
-          <p className="mt-1 text-xs">Try adjusting the date range above.</p>
+        <div className="bt-glass-panel flex flex-col items-center justify-center py-20 text-muted-foreground" style={{ textAlign: 'center' }}>
+          <BarChart3 size={48} style={{ opacity: 0.2, marginBottom: '1rem' }} />
+          <h3 className="chart-title">No analytics data available</h3>
+          <p className="text-sm">Try expanding your date range to capture more sales activity.</p>
         </div>
       )}
     </div>
