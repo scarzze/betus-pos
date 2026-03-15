@@ -23,12 +23,25 @@ app = FastAPI(
     version="1.0.0"
 )
 
+import traceback
+from fastapi.responses import JSONResponse
+from fastapi import Request
+
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception):
+    with open("error.log", "a") as f:
+        f.write(f"\n--- ERROR ON {request.url.path} ---\n")
+        traceback.print_exc(file=f)
+    print(f"500 Error intercepted: {exc}")
+    return JSONResponse(status_code=500, content={"detail": str(exc)})
+
+
 # ==============================
 # CORS (for frontend)
 # ==============================
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # lock down in production
+    allow_origins=["*"],  # Facilitates Netlify <-> Render communication
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -117,3 +130,32 @@ def on_startup():
             db.commit()
     finally:
         db.close()
+
+import os
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse, JSONResponse
+
+# Serve the compiled React Frontend (dist folder)
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+# For Docker, dist is placed next to app directory. Locally, it's one level up from backend.
+FRONTEND_DIST = os.path.join(BASE_DIR, "dist") if os.path.exists(os.path.join(BASE_DIR, "dist")) else os.path.join(os.path.dirname(BASE_DIR), "dist")
+
+if os.path.isdir(FRONTEND_DIST):
+    app.mount("/assets", StaticFiles(directory=os.path.join(FRONTEND_DIST, "assets")), name="assets")
+
+    @app.get("/{file_path:path}")
+    async def serve_spa_and_static(file_path: str):
+        # Do not catch API routes
+        if file_path.startswith("api/"):
+            return JSONResponse(status_code=404, content={"detail": "API endpoint not found"})
+            
+        full_path = os.path.join(FRONTEND_DIST, file_path)
+        if os.path.isfile(full_path):
+            return FileResponse(full_path)
+            
+        # Fallback to index.html for SPA routing
+        index_file = os.path.join(FRONTEND_DIST, "index.html")
+        if os.path.isfile(index_file):
+            return FileResponse(index_file)
+            
+        return JSONResponse(status_code=404, content={"detail": "Frontend application not built"})

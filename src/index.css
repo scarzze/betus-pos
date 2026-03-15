@@ -1,5 +1,11 @@
 @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Inter:wght@400;500;600&display=swap');
 
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+
+
 :root {
   /* Colors */
   --bg-deep: #05050a;
@@ -1279,4 +1285,72 @@ h1, h2, h3, h4, .font-display {
   color: var(--text-dim);
   margin-top: 2rem;
   letter-spacing: 0.02em;
+}
+
+/* ─── Receipt & Print Support ────────────────────────── */
+.receipt-container {
+  display: none;
+}
+
+@media print {
+  body * {
+    visibility: hidden;
+  }
+  .receipt-container, .receipt-container * {
+    visibility: visible;
+  }
+  .receipt-container {
+    display: block;
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 300px;
+    font-family: 'Courier New', Courier, monospace;
+    font-size: 12px;
+    color: black;
+    background: white;
+  }
+  .receipt-header {
+    text-align: center;
+    margin-bottom: 10px;
+  }
+  .receipt-header h2 {
+    font-size: 18px;
+    font-weight: bold;
+    margin: 0;
+  }
+  .receipt-header p {
+    margin: 2px 0;
+  }
+  .receipt-divider {
+    border-top: 1px dashed black;
+    margin: 8px 0;
+  }
+  .receipt-table {
+    width: 100%;
+    border-collapse: collapse;
+  }
+  .receipt-table th, .receipt-table td {
+    padding: 2px;
+  }
+  .receipt-footer {
+    margin-top: 10px;
+  }
+  .receipt-total {
+    display: flex;
+    justify-content: space-between;
+    font-weight: bold;
+    font-size: 14px;
+    margin: 5px 0;
+  }
+  .receipt-method {
+    font-size: 11px;
+    text-align: left;
+    margin-top: 5px;
+  }
+  .thank-you {
+    text-align: center;
+    margin-top: 10px;
+    font-weight: bold;
+  }
 }

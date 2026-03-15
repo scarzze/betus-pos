@@ -1,8 +1,10 @@
 import { useState, useEffect, useRef } from 'react';
-import { Search, ShoppingCart, X, CreditCard, Banknote, Loader2, CheckCircle, Phone, Package, User as UserIcon, ShieldCheck, Timer, AlertCircle, CheckCircle2 } from 'lucide-react';
+import { Search, ShoppingCart, X, CreditCard, Banknote, Loader2, CheckCircle, Phone, Package, User as UserIcon, ShieldCheck, Timer, AlertCircle, CheckCircle2, QrCode } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import api from '@/lib/api';
+import { QRCodeSVG } from 'qrcode.react';
+import { Receipt, ReceiptData } from '@/components/Receipt';
 
 interface Customer {
   id: string;
@@ -39,6 +41,8 @@ const Sales = () => {
   const [showMpesaModal, setShowMpesaModal] = useState(false);
   const [mpesaStage, setMpesaStage] = useState<MpesaStage>('idle');
   const [mpesaStatusMsg, setMpesaStatusMsg] = useState('');
+  const [receiptData, setReceiptData] = useState<ReceiptData | null>(null);
+  const [isOffline, setIsOffline] = useState(!navigator.onLine);
   
   const { user } = useAuth();
   const { toast } = useToast();
@@ -64,6 +68,25 @@ const Sales = () => {
     fetchData();
   }, [saleComplete]);
 
+  // Network Status / Offline Mode watcher
+  useEffect(() => {
+    const handleOnline = () => { 
+      setIsOffline(false); 
+      toast({ title: '🌐 Online Mode Restored', description: 'Network connection established. Sync active.', variant: 'default' }); 
+    };
+    const handleOffline = () => { 
+      setIsOffline(true); 
+      toast({ title: '⚠️ Offline Mode Active', description: 'Transaction logs will cache locally and synchronize once network is restored.', variant: 'destructive' }); 
+    };
+
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
+
   // WebSocket for real-time payment confirmation
   useEffect(() => {
     if (user?.org) {
@@ -77,14 +100,19 @@ const Sales = () => {
           setMpesaStatusMsg('Payment Verified. Transaction Ledger Finalized.');
           toast({ title: '✅ M-Pesa Confirmed', description: 'Payment received successfully.' });
           
+          if (receiptData) {
+            setTimeout(() => window.print(), 100);
+          }
+          
           // Clear cart and close modal after a short delay
           setTimeout(() => {
             setCart([]);
             setSaleComplete(true);
             setShowMpesaModal(false);
             setMpesaStage('idle');
+            setReceiptData(null);
             setTimeout(() => setSaleComplete(false), 2000);
-          }, 3000);
+          }, 1500);
         } else if (data.type === 'payment_failed') {
           setMpesaStage('error');
           setMpesaStatusMsg('Payment Failed or Cancelled by User.');
@@ -163,6 +191,16 @@ const Sales = () => {
         })),
       });
 
+      const stagedReceipt: ReceiptData = {
+        saleNumber,
+        cashierName: (user as any)?.first_name || (user as any)?.name || 'System',
+        date: new Date().toISOString(),
+        paymentMethod: method,
+        items: cart.map(i => ({ name: i.name, qty: i.qty, price: i.selling_price })),
+        totalAmount
+      };
+      setReceiptData(stagedReceipt);
+
       // Handle M-Pesa STK push
       if (method === 'mpesa' && mpesaPhone) {
         try {
@@ -177,12 +215,16 @@ const Sales = () => {
         }
       } else {
         // Non-Mpesa flows
+        setTimeout(() => window.print(), 100);
         setCart([]);
         setSaleComplete(true);
         setSelectedCustomerId('');
         if (method === 'cash') toast({ title: '✅ Sale Complete', description: `${saleNumber} — KES ${totalAmount.toLocaleString()}` });
         if (method === 'credit') toast({ title: '📝 Credit Recorded', description: `${saleNumber} — Assigned to Client` });
-        setTimeout(() => setSaleComplete(false), 2000);
+        setTimeout(() => {
+           setSaleComplete(false);
+           setReceiptData(null);
+        }, 2000);
       }
     } catch (err: any) {
       const msg = err.response?.data?.detail || err.message || 'Unknown error';
@@ -208,9 +250,16 @@ const Sales = () => {
     <div className="sales-container animate-fade-in">
       {/* Product Grid */}
       <section className="product-discovery bt-glass-panel" style={{ padding: '24px' }}>
-        <div className="page-header" style={{ marginBottom: '24px' }}>
-          <h1 className="page-title">Sales Terminal</h1>
-          <p className="page-subtitle">Select products to initialize a new transaction</p>
+        <div className="page-header" style={{ marginBottom: '24px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+          <div>
+             <h1 className="page-title">Sales Terminal</h1>
+             <p className="page-subtitle">Select products to initialize a new transaction</p>
+          </div>
+          {isOffline && (
+             <div className="status-badge theme-danger flex items-center gap-2">
+                <AlertCircle size={14} /> Offline Resiliency Mode
+             </div>
+          )}
         </div>
         
         <div className="search-bar-wrapper">
@@ -427,8 +476,20 @@ const Sales = () => {
                   </div>
                   
                   <div className="bg-white/5 border border-white/5 rounded-2xl p-4 md:p-6 text-center">
+                    <div className="flex justify-center mb-4">
+                       <div className="w-24 h-24 bg-white rounded-xl p-2 flex items-center justify-center">
+                          <QRCodeSVG 
+                            value={`Till: ${import.meta.env.VITE_MPESA_TILL || '4519967'}\nAmount: ${totalAmount}`} 
+                            size={80} 
+                            level="M" 
+                            fgColor="#05050a"
+                            bgColor="#ffffff"
+                          />
+                       </div>
+                    </div>
                     <p className="text-[9px] font-black text-white/20 uppercase tracking-[0.2em] mb-1">Amount to Charge</p>
                     <p className="text-2xl md:text-3xl font-black text-white">KES {totalAmount.toLocaleString()}</p>
+                    <p className="text-[10px] font-bold text-primary tracking-widest mt-2">TILL: {import.meta.env.VITE_MPESA_TILL || '4519967'}</p>
                   </div>
                 </div>
                 
@@ -448,9 +509,9 @@ const Sales = () => {
                  <div className="w-20 h-20 rounded-full bg-emerald-500/20 flex items-center justify-center mx-auto mb-8 border border-emerald-500/30">
                     <CheckCircle2 size={40} className="text-emerald-500" />
                  </div>
-                 <h2 className="text-2xl font-black mb-2 uppercase tracking-tight">Access Verified</h2>
-                 <p className="text-emerald-400/60 font-medium text-sm mb-10">{mpesaStatusMsg}</p>
-                 <div className="py-4 px-6 bg-white/5 rounded-2xl text-[10px] font-bold text-white/20 uppercase tracking-widest">
+                 <h2 className="text-2xl font-black mb-2 uppercase tracking-tight text-emerald-500">Access Verified</h2>
+                 <p className="text-emerald-500 font-medium text-sm mb-10">{mpesaStatusMsg}</p>
+                 <div className="py-4 px-6 bg-emerald-500/10 rounded-2xl text-[10px] font-bold text-emerald-500 uppercase tracking-widest border border-emerald-500/20">
                     Ledger Finalized • {new Date().toLocaleTimeString()}
                  </div>
               </div>
@@ -490,6 +551,9 @@ const Sales = () => {
                         <span className="text-[10px] font-black text-primary uppercase tracking-[0.3em]">Temporal Handshake Active</span>
                      </div>
                      <p className="text-[9px] font-bold text-white/10 uppercase tracking-widest">Do not disconnect or refresh</p>
+                     <button onClick={() => { setMpesaStage('idle'); setShowMpesaModal(false); }} className="px-6 py-2 bg-red-500/10 text-red-500 hover:bg-red-500/20 rounded-full text-[10px] font-bold uppercase tracking-widest transition-colors mt-2">
+                        Cancel Verification
+                     </button>
                   </div>
                 )}
               </div>
@@ -497,6 +561,9 @@ const Sales = () => {
           </div>
         </div>
       )}
+
+      {/* Hidden Receipt Component printed via CSS visibility toggle */}
+      {receiptData && <Receipt data={receiptData} />}
     </div>
   );
 };

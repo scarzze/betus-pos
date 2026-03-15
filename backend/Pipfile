@@ -1,0 +1,21 @@
+[[source]]
+url = "https://pypi.org/simple"
+verify_ssl = true
+name = "pypi"
+
+[packages]
+fastapi = "*"
+uvicorn = "*"
+sqlalchemy = "*"
+psycopg2-binary = "*"
+python-jose = "*"
+passlib = {extras = ["bcrypt"], version = "*"}
+pydantic = "*"
+pydantic-settings = "*"
+python-multipart = "*"
+requests = "*"
+
+[dev-packages]
+
+[requires]
+python_version = "3.13"

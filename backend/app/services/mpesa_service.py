@@ -16,13 +16,23 @@ def get_access_token():
         else "https://api.safaricom.co.ke/oauth/v1/generate?grant_type=client_credentials"
     )
 
+    key = settings.MPESA_CONSUMER_KEY.strip()
+    secret = settings.MPESA_CONSUMER_SECRET.strip()
+    
+    print(f"DEBUG: M-Pesa Auth Key='{key}' ({len(key)} chars)")
+
     try:
         response = requests.get(
             url,
-            auth=(settings.MPESA_CONSUMER_KEY, settings.MPESA_CONSUMER_SECRET),
-            timeout=10
+            auth=(key, secret),
+            timeout=30
         )
-        data = response.json()
+        try:
+            data = response.json()
+        except Exception:
+            print(f"M-Pesa Token Non-JSON Response: {response.status_code} - {response.text}")
+            raise Exception(f"Safaricom returned invalid response: {response.status_code}")
+
         if "access_token" not in data:
             print(f"M-Pesa Auth Error: {data}")
             raise Exception(f"Failed to get access token: {data.get('errorMessage', 'Unknown error')}")
@@ -57,14 +67,24 @@ def stk_push(phone: str, amount: int, reference: str):
         "PartyA": phone,
         "PartyB": settings.MPESA_SHORTCODE,
         "PhoneNumber": phone,
-        "CallBackURL": settings.MPESA_CALLBACK_URL,
-        "AccountReference": str(reference)[:12], # SAFARICOM LIMIT: 12 chars
+        "CallBackURL": f"{settings.MPESA_CALLBACK_URL}?token={settings.WEBHOOK_SECRET}",
+        "AccountReference": str(reference)[:12],
         "TransactionDesc": "Betus POS Payment"
     }
 
+    print(f"DEBUG: STK Payload -> ShortCode={settings.MPESA_SHORTCODE}, Phone={phone}, Amount={amount}")
+
     headers = {"Authorization": f"Bearer {token}"}
     try:
-        response = requests.post(url, json=payload, headers=headers, timeout=10)
-        return response.json()
+        response = requests.post(url, json=payload, headers=headers, timeout=30)
+        data = {}
+        try:
+            data = response.json()
+        except Exception:
+            print(f"M-Pesa STK Non-JSON Response: {response.status_code} - {response.text}")
+            return {"ResponseCode": "1", "errorMessage": f"Safaricom Server Error ({response.status_code})"}
+        
+        print(f"DEBUG: M-Pesa STK Response ({response.status_code}): {data}")
+        return data
     except Exception as e:
         return {"ResponseCode": "1", "errorMessage": f"Connection Error: {str(e)}"}

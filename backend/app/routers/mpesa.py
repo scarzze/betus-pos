@@ -1,13 +1,46 @@
 from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.orm import Session
 from app.core.database import get_db
-from app.services.mpesa_service import stk_push
+from app.services.mpesa_service import stk_push, get_access_token, generate_password
 from app.models.sale import Sale
 from app.models.payment import Payment
 from app.websocket_manager import manager
+from app.core.config import settings
 from uuid import UUID
 
 router = APIRouter()
+
+
+# ==============================
+# 🔬 Diagnostic: Test Credentials
+# ==============================
+
+@router.get("/test-credentials")
+def test_mpesa_credentials():
+    """Quick health check for M-Pesa credentials — call this to diagnose issues."""
+    try:
+        token = get_access_token()
+        password, timestamp = generate_password()
+        return {
+            "status": "✅ Auth OK",
+            "shortcode": settings.MPESA_SHORTCODE,
+            "passkey_length": len(settings.MPESA_PASSKEY),
+            "consumer_key_length": len(settings.MPESA_CONSUMER_KEY.strip()),
+            "consumer_key_prefix": settings.MPESA_CONSUMER_KEY.strip()[:6],
+            "token_prefix": token[:10] + "...",
+            "password_b64_length": len(password),
+            "timestamp": timestamp,
+        }
+    except Exception as e:
+        return {
+            "status": "❌ Auth FAILED",
+            "error": str(e),
+            "shortcode": settings.MPESA_SHORTCODE,
+            "consumer_key_length": len(settings.MPESA_CONSUMER_KEY.strip()),
+            "consumer_key_prefix": settings.MPESA_CONSUMER_KEY.strip()[:6],
+        }
+
+
 
 
 # ==============================
@@ -69,6 +102,11 @@ from app.models.online_order import OnlineOrder
 
 @router.post("/callback")
 async def mpesa_callback(request: Request, db: Session = Depends(get_db)):
+    if request.query_params.get("token") != settings.WEBHOOK_SECRET:
+        import logging
+        logging.warning("Blocked an unauthorized M-Pesa Callback attempt.")
+        raise HTTPException(status_code=403, detail="Unauthorized webhook signature")
+
     data = await request.json()
 
     try:

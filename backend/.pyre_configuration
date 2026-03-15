@@ -1,0 +1,8 @@
+{
+  "source_directories": [
+    "."
+  ],
+  "search_path": [
+    "/home/ybh/venvs/dev/lib/python3.13/site-packages"
+  ]
+}

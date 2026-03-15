@@ -1,0 +1,14 @@
+services:
+  - type: web
+    name: betus-pos-backend
+    env: docker
+    dockerContext: backend
+    dockerfilePath: backend/Dockerfile
+    plan: free
+    envVars:
+      - key: DATABASE_URL
+        value: sqlite:///./betus.db # Free tier ephemeral disk, consider Render Postgres for persistence
+      - key: SECRET_KEY
+        generateValue: true
+      - key: MPESA_ENV
+        value: sandbox
