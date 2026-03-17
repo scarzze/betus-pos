@@ -1,7 +1,11 @@
 {
-  "rewrite": [
+  "rewrites": [
     {
-      "source": "/(.*)",
+      "source": "/api/:path*",
+      "destination": "https://tarella-wears-backend.onrender.com/api/:path*"
+    },
+    {
+      "source": "/((?!api/).*)",
       "destination": "/index.html"
     }
   ]
