@@ -1,14 +1,26 @@
 services:
   - type: web
-    name: betus-pos-backend
+    name: tarella-wears-backend
     env: docker
     dockerContext: backend
     dockerfilePath: backend/Dockerfile
     plan: free
     envVars:
       - key: DATABASE_URL
-        value: sqlite:///./betus.db # Free tier ephemeral disk, consider Render Postgres for persistence
+        value: postgresql://tarela_user:TDKqJIWKkevDq1TA5RzAmLLdsYJQERjA@dpg-d6sldhruibrs73edi7eg-a/tarela
       - key: SECRET_KEY
-        generateValue: true
+        value: tarella_wears_secure_prod_2024
       - key: MPESA_ENV
-        value: sandbox
+        value: production
+      - key: MPESA_SHORTCODE
+        value: "400200"
+      - key: MPESA_CONSUMER_KEY
+        value: YOUR_PRODUCTION_KEY
+      - key: MPESA_CONSUMER_SECRET
+        value: YOUR_PRODUCTION_SECRET
+      - key: MPESA_PASSKEY
+        value: YOUR_PRODUCTION_PASSKEY
+      - key: MPESA_CALLBACK_URL
+        value: https://tarella-wears-backend.onrender.com/api/mpesa/callback
+      - key: WEBHOOK_SECRET
+        value: tarella_wears_webhook_123

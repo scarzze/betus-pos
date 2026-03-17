@@ -19,6 +19,7 @@ interface Product {
   buying_price: number;
   stock: number;
   sku: string;
+  size?: string;
 }
 
 interface CartItem extends Product {
@@ -185,6 +186,7 @@ const Sales = () => {
           product_id: item.id,
           product_name: item.name,
           quantity: item.qty,
+          size: item.size,
           selling_price: item.selling_price,
           buying_price: item.buying_price,
           subtotal: item.selling_price * item.qty,
@@ -196,7 +198,7 @@ const Sales = () => {
         cashierName: (user as any)?.first_name || (user as any)?.name || 'System',
         date: new Date().toISOString(),
         paymentMethod: method,
-        items: cart.map(i => ({ name: i.name, qty: i.qty, price: i.selling_price })),
+        items: cart.map(i => ({ name: i.name, size: i.size, qty: i.qty, price: i.selling_price })),
         totalAmount
       };
       setReceiptData(stagedReceipt);
@@ -337,7 +339,7 @@ const Sales = () => {
               {cart.map(item => (
                 <div key={item.id} className="cart-item animate-slide-up">
                   <div className="item-details" style={{ flex: 1 }}>
-                    <p className="item-name">{item.name}</p>
+                    <p className="item-name">{item.name} {item.size ? `(${item.size})` : ''}</p>
                     <p className="item-price">KES {item.selling_price.toLocaleString()}</p>
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>

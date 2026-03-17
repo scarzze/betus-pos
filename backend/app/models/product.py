@@ -19,6 +19,7 @@ class Product(Base):
     selling_price = Column(Float, default=0.0)
     stock_quantity = Column(Integer, default=0)
     low_stock_threshold = Column(Integer, default=5)
+    size = Column(String, nullable=True) # For apparel support
     imei_tracking = Column(Boolean, default=False)
     
     # Ecommerce Flags

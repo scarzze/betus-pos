@@ -122,8 +122,8 @@ def on_startup():
         from app.models.settings import Settings
         if not db.query(Settings).first():
             config = Settings(
-                shop_name="Betus Electronics",
-                receipt_footer="Thank you for shopping at Betus!",
+                shop_name="Tarella Wears",
+                receipt_footer="Be Different, Be Tarella.",
                 currency="KES"
             )
             db.add(config)

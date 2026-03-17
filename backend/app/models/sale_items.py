@@ -11,5 +11,6 @@ class SaleItem(Base):
     product_id = Column(UUID(as_uuid=True), ForeignKey("products.id"), nullable=False)
     
     quantity = Column(Integer, nullable=False)
+    size = Column(String, nullable=True) # Snapshots size at time of sale
     selling_price = Column(Float, nullable=False)
     buying_price = Column(Float, default=0.0)

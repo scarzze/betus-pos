@@ -8,11 +8,18 @@ class Settings(BaseSettings):
     DATABASE_URL: str = os.getenv("DATABASE_URL", "sqlite:///./betus.db")
     MPESA_CONSUMER_KEY: str = "AdOWXv3aRdJJcamW1thy4eldjcW2ED2QylWNPqCDKQuXAxkU"
     MPESA_CONSUMER_SECRET: str = "FGSrNkKBp49J0Emjo80jVt3Gerb9UyQzGyTL7JYz5F5uD19KbxE6d3j2fKANztYW"
-    MPESA_SHORTCODE: str = "174379"
+    MPESA_SHORTCODE: str = "400200"
     MPESA_PASSKEY: str = "bfb279f9aa9bdbcf158e97dd71a467cd2e0c893059b10f78e6b72ada1ed2c919"
-    MPESA_CALLBACK_URL: str = "https://unwelted-gearldine-bigamously.ngrok-free.dev/api/mpesa/callback"
-    MPESA_ENV: str = "sandbox"
+    MPESA_CALLBACK_URL: str = "https://betus-pos-backend.onrender.com/api/mpesa/callback"
+    MPESA_ENV: str = "production"
     WEBHOOK_SECRET: str = "betus_pos_secure_123"
+
+    @property
+    def SQLALCHEMY_DATABASE_URL(self) -> str:
+        url = self.DATABASE_URL
+        if url.startswith("postgres://"):
+            url = url.replace("postgres://", "postgresql://", 1)
+        return url
 
     class Config:
         env_file = ".env"

@@ -4,7 +4,7 @@ import React from 'react';
 export interface ReceiptData {
   saleNumber: string;
   cashierName: string;
-  items: { name: string; qty: number; price: number }[];
+  items: { name: string; size?: string; qty: number; price: number }[];
   totalAmount: number;
   paymentMethod: string;
   date: string;
@@ -20,9 +20,9 @@ export const Receipt: React.FC<ReceiptProps> = ({ data }) => {
   return (
     <div className="receipt-container" id="printable-receipt">
       <div className="receipt-header">
-        <h2>BETUS POS</h2>
-        <p>123 Digital Ave, Nairobi</p>
-        <p>Tel: +254 700 000 000</p>
+        <h2>TARELLA WEARS</h2>
+        <p>Fashion St, Nairobi</p>
+        <p>Tel: +254 700 315 777</p>
         <div className="receipt-divider"></div>
         <p>Receipt #: {data.saleNumber}</p>
         <p>Date: {new Date(data.date).toLocaleString()}</p>
@@ -34,7 +34,7 @@ export const Receipt: React.FC<ReceiptProps> = ({ data }) => {
         <table className="receipt-table">
           <thead>
             <tr>
-              <th className="text-left">Item</th>
+              <th className="text-left">Item (Size)</th>
               <th className="text-center">Qty</th>
               <th className="text-right">Price</th>
             </tr>
@@ -42,7 +42,7 @@ export const Receipt: React.FC<ReceiptProps> = ({ data }) => {
           <tbody>
             {data.items.map((item, idx) => (
               <tr key={idx}>
-                <td className="text-left">{item.name}</td>
+                <td className="text-left">{item.name} {item.size ? `(${item.size})` : ''}</td>
                 <td className="text-center">{item.qty}</td>
                 <td className="text-right">{(item.price * item.qty).toLocaleString()}</td>
               </tr>
@@ -61,7 +61,7 @@ export const Receipt: React.FC<ReceiptProps> = ({ data }) => {
           <span>Paid via: {data.paymentMethod.toUpperCase()}</span>
         </div>
         <div className="receipt-divider"></div>
-        <p className="thank-you">Thank you for your business!</p>
+        <p className="thank-you">Be Different, Be Tarella.</p>
       </div>
     </div>
   );

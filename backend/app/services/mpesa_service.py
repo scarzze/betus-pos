@@ -68,7 +68,7 @@ def stk_push(phone: str, amount: int, reference: str):
         "PartyB": settings.MPESA_SHORTCODE,
         "PhoneNumber": phone,
         "CallBackURL": f"{settings.MPESA_CALLBACK_URL}?token={settings.WEBHOOK_SECRET}",
-        "AccountReference": str(reference)[:12],
+        "AccountReference": f"31577-{str(reference)[:5]}",
         "TransactionDesc": "Betus POS Payment"
     }
 
